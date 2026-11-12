@@ -419,13 +419,13 @@ const loadCart = useCallback(async () => {
               return (
                 <article
                   key={item.productId}
-                  className={`premium-card group relative overflow-hidden rounded-3xl border border-white/80 bg-white/95 p-4 shadow-[0_16px_45px_-28px_rgba(15,23,42,0.28)] ring-1 ring-slate-200/70 transition duration-300 hover:-translate-y-0.5 hover:shadow-xl sm:p-5 ${
+                  className={`premium-card group relative overflow-hidden rounded-3xl border border-white/80 bg-white/95 p-4 shadow-[0_16px_45px_-28px_rgba(15,23,42,0.28)] ring-1 ring-slate-200/70 transition duration-300 hover:-translate-y-0.5 hover:shadow-xl p-3 sm:p-5 ${
                     isBusy ? "opacity-60" : ""
                   }`}
                 >
-                  <div className="flex flex-col gap-4 min-[480px]:flex-row">
+                  <div className="flex flex-row items-start gap-3 min-[480px]:gap-4">
                     {/* PRODUCT VISUAL */}
-                    <div className="relative flex aspect-[4/3] w-full shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-50 to-violet-100 ring-1 ring-indigo-100/70 min-[480px]:h-32 min-[480px]:w-32">
+                    <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-indigo-50 to-violet-100 ring-1 ring-indigo-100/70 min-[480px]:h-32 min-[480px]:w-32 min-[480px]:rounded-2xl">
   {item.product.imageUrl ? (
     <img
       src={item.product.imageUrl}
@@ -434,9 +434,9 @@ const loadCart = useCallback(async () => {
       className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
     />
   ) : (
-    <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-white/80 bg-white/60 text-indigo-400 shadow-sm">
-      <ShoppingBag size={42} strokeWidth={1.2} />
-    </div>
+    <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-white/80 bg-white/60 text-indigo-400 shadow-sm min-[480px]:h-20 min-[480px]:w-20">
+  <ShoppingBag size={32} className="min-[480px]:!h-[42px] min-[480px]:!w-[42px]" strokeWidth={1.2} />
+</div>
   )}
 </div>
 
