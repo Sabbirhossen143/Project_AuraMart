@@ -296,7 +296,7 @@ export default function WishlistPage() {
 </Link>
           </div>
         ) : (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3">
             {items.map((item) => {
               const product = item.product;
               const isRemoving = removingId === item.productId;
@@ -337,7 +337,7 @@ export default function WishlistPage() {
                       </div>
                     )}
 
-                    <span className="absolute left-3 top-3 z-10 rounded-full border border-white/80 bg-white/95 px-3 py-1.5 text-[9px] font-extrabold uppercase tracking-wider text-indigo-600 shadow-md backdrop-blur-md sm:text-[10px]">
+                    <span className="absolute left-2 top-2 z-10 rounded-full border border-white/80 bg-white/95 px-2 py-1 text-[7px] font-extrabold uppercase tracking-wide text-indigo-600 shadow-md backdrop-blur-md sm:left-3 sm:top-3 sm:px-3 sm:py-1.5 sm:text-[10px] sm:tracking-wider">
                       Saved Product
                     </span>
 
@@ -349,28 +349,28 @@ export default function WishlistPage() {
                       }}
                       disabled={isRemoving}
                       aria-label="Remove from wishlist"
-                      className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/80 bg-white/95 text-rose-500 shadow-lg backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-rose-50 disabled:opacity-50"
+                      className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-white/80 bg-white/95 text-rose-500 shadow-md backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-rose-50 disabled:opacity-50 sm:right-3 sm:top-3 sm:h-10 sm:w-10 sm:shadow-lg"
                     >
                       {isRemoving ? (
-                        <Loader2 size={18} className="animate-spin" />
+                        <Loader2 size={15} className="animate-spin sm:h-[18px] sm:w-[18px]" />
                       ) : (
-                        <Trash2 size={18} />
+                        <Trash2 size={15} className="sm:h-[18px] sm:w-[18px]" />
                       )}
                     </button>
 
                     {product && product.stock <= 0 && (
-                      <span className="absolute bottom-3 left-3 z-10 rounded-full bg-slate-950/90 px-3 py-1.5 text-[10px] font-bold text-white shadow-lg backdrop-blur-md">
-                        Out of Stock
-                      </span>
-                    )}
+  <span className="absolute bottom-2 left-2 z-10 whitespace-nowrap rounded-full bg-slate-950/90 px-1.5 py-0.5 text-[9px] font-bold text-white shadow-md backdrop-blur-md sm:bottom-3 sm:left-3 sm:px-3 sm:py-1.5 sm:text-[10px] sm:shadow-lg">
+    Out of Stock
+  </span>
+)}
                     {product?.discountPercent && product.discountPercent > 0 ? (
-                      <span className="absolute bottom-3 right-3 z-10 inline-flex items-center rounded-full border border-rose-200/80 bg-gradient-to-r from-rose-600 to-orange-500 px-3 py-1.5 text-[10px] font-black tracking-wide text-white shadow-lg shadow-rose-200/60 sm:text-xs">
+                      <span className="absolute bottom-2 right-2 z-10 inline-flex items-center rounded-full border border-rose-200/80 bg-gradient-to-r from-rose-600 to-orange-500 px-1.5 py-0.5 text-[9px] font-black tracking-wide text-white shadow-md shadow-rose-200/60 sm:bottom-3 sm:right-3 sm:px-3 sm:py-1.5 sm:text-xs sm:shadow-lg">
                         {product.discountPercent}% OFF
                       </span>
                     ) : null}
                   </div>
 
-                  <div className="p-4 sm:p-5">
+                  <div className="p-2.5 sm:p-5">
                     {product ? (
                       <>
                         <h3 className="line-clamp-1 text-sm font-extrabold text-slate-900 sm:text-base">
@@ -398,17 +398,17 @@ export default function WishlistPage() {
                             )}
                           </div>
                           <span
-                            className={`inline-flex items-center gap-1 text-[10px] font-bold ${
-                              product.stock > 0 ? "text-emerald-600" : "text-rose-500"
-                            }`}
-                          >
-                            <span
-                              className={`h-1.5 w-1.5 rounded-full ${
-                                product.stock > 0 ? "bg-emerald-500" : "bg-rose-500"
-                              }`}
-                            />
-                            {product.stock > 0 ? "In Stock" : "Unavailable"}
-                          </span>
+  className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[9px] font-bold sm:text-[10px] ${
+    product.stock > 0 ? "text-emerald-600" : "text-rose-500"
+  }`}
+>
+  <span
+    className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+      product.stock > 0 ? "bg-emerald-500" : "bg-rose-500"
+    }`}
+  />
+  {product.stock > 0 ? "In Stock" : "Unavailable"}
+</span>
                         </div>
 
                         <button
@@ -418,26 +418,26 @@ export default function WishlistPage() {
                             void addToCart(item.productId);
                           }}
                           disabled={isAdding || isRemoving || product.stock <= 0}
-                          className="group premium-button relative mt-5 flex h-12 w-full items-center justify-between gap-3 overflow-hidden rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-600 to-violet-600 px-3.5 text-sm font-bold text-white shadow-lg shadow-indigo-200/70 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-indigo-300/60 active:translate-y-0 disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-60 disabled:shadow-none"
+                          className="group premium-button relative -mx-1.5 mt-4 flex h-10 w-[calc(100%+0.75rem)] items-center justify-between gap-1.5 overflow-hidden rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-600 to-violet-600 px-2 text-[10px] font-bold text-white shadow-lg shadow-indigo-200/70 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-indigo-300/60 active:translate-y-0 disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-60 disabled:shadow-none sm:mx-0 sm:mt-5 sm:h-12 sm:w-full sm:gap-3 sm:px-3.5 sm:text-sm"
                         >
-                          <span className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/15 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
-                          <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/15 transition-colors group-hover:bg-white/25">
-                            {isAdding ? (
-                              <Loader2 size={17} className="animate-spin" />
-                            ) : (
-                              <ShoppingCart size={17} />
-                            )}
-                          </span>
-                          <span className="relative flex-1 text-center">
+                          <span className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-white/15 transition-colors group-hover:bg-white/25 sm:h-8 sm:w-8">
+  {isAdding ? (
+    <Loader2 size={14} className="animate-spin sm:h-[17px] sm:w-[17px]" />
+  ) : (
+    <ShoppingCart size={14} className="sm:h-[17px] sm:w-[17px]" />
+  )}
+</span>
+                          <span className="relative flex-1 whitespace-nowrap text-center">
                             {isAdding
                               ? "Adding to Cart..."
                               : product.stock <= 0
                                 ? "Out of Stock"
                                 : "Add to Cart"}
                           </span>
-                          <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/15 transition-all duration-300 group-hover:translate-x-0.5 group-hover:bg-white/25">
-                            <Plus size={17} />
-                          </span>
+                          <span className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-white/15 transition-all duration-300 group-hover:translate-x-0.5 group-hover:bg-white/25 sm:h-8 sm:w-8">
+  <Plus size={14} className="sm:h-[17px] sm:w-[17px]" />
+</span>
+                          
                         </button>
                       </>
                     ) : (
