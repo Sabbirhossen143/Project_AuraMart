@@ -189,29 +189,40 @@ useEffect(() => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-indigo-50/40">
-      <section className="bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700 px-4 py-10 text-white sm:py-14">
+      <section className="bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700 px-4 py-7 text-white sm:py-14">
         <div className="mx-auto max-w-6xl">
           <Link
             href="/account/orders"
-            className="mb-6 inline-flex items-center gap-2 text-sm text-indigo-100 transition hover:text-white"
+            className="mb-4 inline-flex items-center gap-1.5 text-xs text-indigo-100 transition hover:text-white sm:mb-6 sm:gap-2 sm:text-sm"
           >
-            <ArrowLeft size={17} />
+            <ArrowLeft size={15} />
             Back to My Orders
           </Link>
 
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-sm text-indigo-100">Order Details</p>
-              <h1 className="mt-2 break-all text-2xl font-bold sm:text-3xl">
-                #{order.id}
-              </h1>
-              <p className="mt-2 text-sm text-indigo-100">
+          <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-indigo-100 sm:text-sm">Order Details</p>
+              <div className="mt-1.5 flex min-w-0 items-center gap-2 sm:mt-2 sm:gap-3">
+                <h1 className="min-w-0 break-all text-[11px] font-bold leading-5 sm:text-3xl">
+                  #{order.id}
+                </h1>
+                <span
+                  className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-bold sm:hidden ${
+                    isCancelled
+                      ? "bg-red-100 text-red-700"
+                      : "bg-white text-indigo-700"
+                  }`}
+                >
+                  {order.orderStatus}
+                </span>
+              </div>
+              <p className="mt-1.5 text-[11px] text-indigo-100 sm:mt-2 sm:text-sm">
                 Placed on {formatDate(order.createdAt)}
               </p>
             </div>
 
             <span
-              className={`rounded-full px-4 py-2 text-sm font-bold ${
+              className={`hidden shrink-0 rounded-full px-4 py-2 text-sm font-bold sm:inline-flex ${
                 isCancelled
                   ? "bg-red-100 text-red-700"
                   : "bg-white text-indigo-700"
@@ -225,8 +236,8 @@ useEffect(() => {
 
       <main className="mx-auto max-w-6xl space-y-6 px-4 py-10 sm:py-12">
         {/* Order Tracking */}
-        <section className="rounded-3xl border border-white/80 bg-white p-5 shadow-lg shadow-slate-200/40 ring-1 ring-slate-100 sm:p-7">
-          <h2 className="text-lg font-bold text-slate-900">
+        <section className="rounded-3xl border border-white/80 bg-white p-3 shadow-lg shadow-slate-200/40 ring-1 ring-slate-100 sm:p-7">
+          <h2 className="text-base font-bold text-slate-900 sm:text-lg">
             Order Tracking
           </h2>
 
@@ -241,7 +252,7 @@ useEffect(() => {
               </div>
             </div>
           ) : (
-            <div className="mt-8 grid grid-cols-2 gap-y-7 sm:grid-cols-5">
+            <div className="mt-6 grid grid-cols-5 gap-x-1 sm:mt-8 sm:gap-x-2">
               {statusSteps.map((step, index) => {
                 const completed = currentStep >= index;
                 const active = currentStep === index;
@@ -254,28 +265,28 @@ useEffect(() => {
                   >
                     {index !== 0 && (
                       <div
-                        className={`absolute right-1/2 top-5 hidden h-0.5 w-full sm:block ${
+                        className={`absolute right-1/2 top-4 h-0.5 w-full sm:top-5 ${
                           completed ? "bg-indigo-600" : "bg-slate-200"
                         }`}
                       />
                     )}
 
                     <div
-                      className={`relative z-10 flex h-11 w-11 items-center justify-center rounded-full border-2 ${
+                      className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 sm:h-11 sm:w-11 ${
                         completed
                           ? "border-indigo-600 bg-indigo-600 text-white"
                           : "border-slate-200 bg-white text-slate-400"
                       } ${active ? "ring-4 ring-indigo-100" : ""}`}
                     >
                       {completed && index < currentStep ? (
-                        <Check size={20} />
+                        <Check size={14} className="sm:h-5 sm:w-5" />
                       ) : (
-                        <StepIcon size={20} />
+                        <StepIcon size={14} className="sm:h-5 sm:w-5" />
                       )}
                     </div>
 
                     <p
-                      className={`mt-3 text-xs font-semibold sm:text-sm ${
+                      className={`mt-2 whitespace-nowrap text-[8px] font-semibold leading-tight sm:mt-3 sm:text-sm ${
                         completed ? "text-indigo-700" : "text-slate-400"
                       }`}
                     >
