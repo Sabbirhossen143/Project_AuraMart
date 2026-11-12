@@ -761,34 +761,34 @@ export default function Home() {
               </a>
             </div>
 
-            <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-4 border-t-2 border-indigo-300 pt-7 sm:mt-12">
-  <div>
-    <p className="text-xl font-black tracking-tight text-slate-900 sm:text-2xl">
+          <div className="mt-10 flex flex-nowrap items-center justify-between gap-x-2 border-t-2 border-indigo-300 pt-7 sm:mt-12 sm:justify-start sm:gap-x-8">
+  <div className="min-w-0">
+    <p className="text-base font-black tracking-tight text-slate-900 sm:text-2xl">
       Quality
     </p>
-    <p className="mt-1 text-[11px] text-slate-500 sm:text-xs">
+    <p className="mt-1 whitespace-nowrap text-[9px] leading-tight text-slate-500 sm:text-xs">
       Products you can trust
     </p>
   </div>
 
-  <div className="h-10 w-[2px] bg-indigo-300" />
+  <div className="h-8 w-px shrink-0 bg-indigo-300 sm:h-10 sm:w-[2px]" />
 
-  <div>
-    <p className="text-xl font-black tracking-tight text-slate-900 sm:text-2xl">
+  <div className="min-w-0">
+    <p className="text-base font-black tracking-tight text-slate-900 sm:text-2xl">
       Value
     </p>
-    <p className="mt-1 text-[11px] text-slate-500 sm:text-xs">
+    <p className="mt-1 whitespace-nowrap text-[9px] leading-tight text-slate-500 sm:text-xs">
       Prices you'll appreciate
     </p>
   </div>
 
-  <div className="h-10 w-[2px] bg-indigo-300" />
+  <div className="h-8 w-px shrink-0 bg-indigo-300 sm:h-10 sm:w-[2px]" />
 
-  <div>
-    <p className="text-xl font-black tracking-tight text-slate-900 sm:text-2xl">
+  <div className="min-w-0">
+    <p className="text-base font-black tracking-tight text-slate-900 sm:text-2xl">
       Simple
     </p>
-    <p className="mt-1 text-[11px] text-slate-500 sm:text-xs">
+    <p className="mt-1 whitespace-nowrap text-[9px] leading-tight text-slate-500 sm:text-xs">
       Shopping made easy
     </p>
   </div>
@@ -1068,9 +1068,9 @@ export default function Home() {
   )}
 
   {/* Featured Badge */}
-  <span className="absolute left-3 top-3 z-10 rounded-full border border-white/80 bg-white/95 px-3 py-1.5 text-[9px] font-extrabold uppercase tracking-wider text-indigo-600 shadow-md backdrop-blur-md sm:text-[10px]">
-    Featured
-  </span>
+  <span className="absolute left-2 top-2 z-10 rounded-full border border-white/80 bg-white/95 px-2 py-1 text-[8px] font-extrabold uppercase tracking-wide text-indigo-600 shadow-md backdrop-blur-md sm:left-3 sm:top-3 sm:px-3 sm:py-1.5 sm:text-[10px] sm:tracking-wider">
+  Featured
+</span>
 
   {/* Wishlist Button */}
   <button
@@ -1085,14 +1085,15 @@ export default function Home() {
       event.stopPropagation();
       void handleAddToWishlist(product.id);
     }}
-    className={`absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/80 bg-white/95 shadow-lg backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-rose-50 ${
-      wishlistIds.includes(product.id)
-        ? "text-rose-500"
-        : "text-slate-600 hover:text-rose-500"
-    }`}
+    className={`absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-white/80 bg-white/95 shadow-md backdrop-blur-md transition-all duration-300 hover:scale-110 hover:bg-rose-50 sm:right-3 sm:top-3 sm:h-10 sm:w-10 sm:shadow-lg ${
+  wishlistIds.includes(product.id)
+    ? "text-rose-500"
+    : "text-slate-600 hover:text-rose-500"
+}`}
   >
     <Heart
-      size={19}
+      size={16}
+      className="sm:h-[19px] sm:w-[19px]"
       fill={
         wishlistIds.includes(product.id)
           ? "currentColor"
@@ -1103,15 +1104,15 @@ export default function Home() {
 
   {/* Stock Badge */}
   {product.stock <= 0 && (
-    <span className="absolute bottom-3 left-3 z-10 rounded-full bg-slate-950/90 px-3 py-1.5 text-[10px] font-bold text-white shadow-lg backdrop-blur-md">
-      Out of Stock
-    </span>
+    <span className="absolute bottom-2 left-2 z-10 rounded-full bg-slate-950/90 px-2 py-1 text-[9px] font-bold text-white shadow-md backdrop-blur-md sm:bottom-3 sm:left-3 sm:px-3 sm:py-1.5 sm:text-[10px] sm:shadow-lg">
+  Out of Stock
+</span>
   )}
 
   {product.discountPercent && product.discountPercent > 0 ? (
-    <span className="absolute bottom-3 right-3 z-10 inline-flex items-center rounded-full border border-rose-200/80 bg-gradient-to-r from-rose-600 to-orange-500 px-3 py-1.5 text-[10px] font-black tracking-wide text-white shadow-lg shadow-rose-200/60 sm:text-xs">
-      {product.discountPercent}% OFF
-    </span>
+    <span className="absolute bottom-2 right-2 z-10 inline-flex items-center rounded-full border border-rose-200/80 bg-gradient-to-r from-rose-600 to-orange-500 px-2 py-1 text-[9px] font-black tracking-wide text-white shadow-md shadow-rose-200/60 sm:bottom-3 sm:right-3 sm:px-3 sm:py-1.5 sm:text-xs sm:shadow-lg">
+  {product.discountPercent}% OFF
+</span>
   ) : null}
 
 </div>
@@ -1125,40 +1126,45 @@ export default function Home() {
                       {product.description}
                     </p>
 
-                    <div className="mt-4 flex items-center justify-between gap-2">
-                      <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                        {product.discountPercent && product.discountPercent > 0 ? (
-                          <>
-                            <span className="text-base font-black tracking-tight text-rose-600 sm:text-lg">
-                              {formatPrice(getDiscountedPrice(product.price, product.discountPercent))}
-                            </span>
-                            <span className="text-xs font-semibold text-slate-400 line-through">
-                              {formatPrice(product.price)}
-                            </span>
-                          </>
-                        ) : (
-                          <span className="text-base font-black tracking-tight text-indigo-600 sm:text-lg">
-                            {formatPrice(product.price)}
-                          </span>
-                        )}
-                      </div>
-                      <span
-                        className={`inline-flex items-center gap-1 text-[10px] font-bold ${
-                          product.stock > 0
-                            ? "text-emerald-600"
-                            : "text-rose-500"
-                        }`}
-                      >
-                        <span
-                          className={`h-1.5 w-1.5 rounded-full ${
-                            product.stock > 0 ? "bg-emerald-500" : "bg-rose-500"
-                          }`}
-                        />
-                        {product.stock > 0 ? "In Stock" : "Unavailable"}
-                      </span>                     
-                    </div>
+                    
+<div className="mt-4 flex items-center justify-between gap-1.5 sm:gap-2">
+  
+<div className="flex min-w-0 flex-col items-start gap-0 sm:flex-row sm:items-baseline sm:gap-x-2">
+  {product.discountPercent && product.discountPercent > 0 ? (
+    <>
+      <span className="whitespace-nowrap text-sm font-black tracking-tight text-rose-600 sm:text-lg">
+        {formatPrice(
+          getDiscountedPrice(product.price, product.discountPercent)
+        )}
+      </span>
+      <span className="whitespace-nowrap text-[10px] font-semibold text-slate-400 line-through sm:text-xs">
+        {formatPrice(product.price)}
+      </span>
+    </>
+  ) : (
+    <span className="whitespace-nowrap text-sm font-black tracking-tight text-indigo-600 sm:text-lg">
+      {formatPrice(product.price)}
+    </span>
+  )}
+</div>
+
+
+  <span
+    className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[9px] font-bold sm:text-[10px] ${
+      product.stock > 0 ? "text-emerald-600" : "text-rose-500"
+    }`}
+  >
+    <span
+      className={`h-1.5 w-1.5 rounded-full ${
+        product.stock > 0 ? "bg-emerald-500" : "bg-rose-500"
+      }`}
+    />
+    {product.stock > 0 ? "In Stock" : "Unavailable"}
+  </span>
+</div>
 
                     
+
 <button
   type="button"
   onClick={(event) => {
@@ -1169,22 +1175,22 @@ export default function Home() {
     product.stock <= 0 ||
     addingProduct === product.id
   }
-  className="group premium-button relative mt-5 flex h-12 w-full items-center justify-between gap-3 overflow-hidden rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-600 to-violet-600 px-3.5 text-sm font-bold text-white shadow-lg shadow-indigo-200/70 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-indigo-300/60 active:translate-y-0 disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-60 disabled:shadow-none"
+  className="group premium-button relative -mx-2 mt-5 flex h-10 w-[calc(100%+1rem)] items-center justify-between gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-600 to-violet-600 px-2.5 text-[11px] font-bold text-white shadow-lg shadow-indigo-200/70 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-indigo-300/60 active:translate-y-0 disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-60 disabled:shadow-none sm:mx-0 sm:h-12 sm:w-full sm:gap-3 sm:px-3.5 sm:text-sm"
 >
   {/* Button Shine Effect */}
   <span className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/15 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
 
   {/* Cart Icon */}
-  <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/15 transition-colors group-hover:bg-white/25">
+  <span className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-white/15 transition-colors group-hover:bg-white/25 sm:h-8 sm:w-8">
     {addingProduct === product.id ? (
-      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white sm:h-4 sm:w-4" />
     ) : (
-      <ShoppingCart size={17} />
+      <ShoppingCart size={14} className="sm:h-[17px] sm:w-[17px]" />
     )}
   </span>
 
   {/* Button Text */}
-  <span className="relative flex-1 text-center">
+  <span className="relative flex-1 whitespace-nowrap text-center">
     {addingProduct === product.id
       ? "Adding to Cart..."
       : product.stock <= 0
@@ -1192,11 +1198,12 @@ export default function Home() {
         : "Add to Cart"}
   </span>
 
-  {/* Arrow Icon */}
-  <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/15 transition-all duration-300 group-hover:translate-x-0.5 group-hover:bg-white/25">
-    <Plus size={17} />
+  {/* Plus Icon */}
+  <span className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-white/15 transition-all duration-300 group-hover:translate-x-0.5 group-hover:bg-white/25 sm:h-8 sm:w-8">
+    <Plus size={14} className="sm:h-[17px] sm:w-[17px]" />
   </span>
 </button>
+
 
                   </div>
                 </article>
