@@ -210,31 +210,32 @@ export default function WishlistPage() {
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_rgba(99,102,241,0.08),_transparent_38%),linear-gradient(180deg,#f8faff_0%,#f1f5f9_100%)]">
       {/* Header */}
-      <section className="bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700 px-4 py-12 text-white sm:py-16">
-        <div className="mx-auto max-w-6xl">
-          <div className="mb-3 text-sm text-indigo-100">
-            <Link href="/" className="hover:text-white">
-              Home
-            </Link>
-            <span className="mx-2">/</span>
-            My Wishlist
-          </div>
+      <section className="bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700 px-4 py-7 text-white sm:py-16">
+  <div className="mx-auto max-w-6xl">
+    <div className="mb-2 text-xs text-indigo-100 sm:mb-3 sm:text-sm">
+      <Link href="/" className="hover:text-white">
+        Home
+      </Link>
+      <span className="mx-2">/</span>
+      My Wishlist
+    </div>
 
-          <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15">
-              <Heart size={30} />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold sm:text-4xl">
-                My Wishlist
-              </h1>
-              <p className="mt-1 text-sm text-indigo-100 sm:text-base">
-                Your favorite products, all in one place.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+    <div className="flex items-center gap-3 sm:gap-4">
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 sm:h-14 sm:w-14 sm:rounded-2xl">
+        <Heart size={22} className="sm:h-[30px] sm:w-[30px]" />
+      </div>
+
+      <div>
+        <h1 className="text-2xl font-bold sm:text-4xl">
+          My Wishlist
+        </h1>
+        <p className="mt-1 text-xs text-indigo-100 sm:text-base">
+          Your favorite products, all in one place.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
 
       <main className="mx-auto max-w-6xl px-4 py-10 sm:py-14">
         <div className="mb-7 flex flex-wrap items-center justify-between gap-3">
@@ -359,12 +360,12 @@ export default function WishlistPage() {
                     </button>
 
                     {product && product.stock <= 0 && (
-  <span className="absolute bottom-2 left-2 z-10 whitespace-nowrap rounded-full bg-slate-950/90 px-1.5 py-0.5 text-[9px] font-bold text-white shadow-md backdrop-blur-md sm:bottom-3 sm:left-3 sm:px-3 sm:py-1.5 sm:text-[10px] sm:shadow-lg">
+  <span className="absolute bottom-2 left-2 z-10 whitespace-nowrap rounded-full bg-slate-950/90 px-1.5 py-0.5 text-[8px] font-bold text-white shadow-md backdrop-blur-md sm:bottom-3 sm:left-3 sm:px-3 sm:py-1.5 sm:text-[10px] sm:shadow-lg">
     Out of Stock
   </span>
 )}
                     {product?.discountPercent && product.discountPercent > 0 ? (
-                      <span className="absolute bottom-2 right-2 z-10 inline-flex items-center rounded-full border border-rose-200/80 bg-gradient-to-r from-rose-600 to-orange-500 px-1.5 py-0.5 text-[9px] font-black tracking-wide text-white shadow-md shadow-rose-200/60 sm:bottom-3 sm:right-3 sm:px-3 sm:py-1.5 sm:text-xs sm:shadow-lg">
+                      <span className="absolute bottom-2 right-2 z-10 inline-flex items-center rounded-full border border-rose-200/80 bg-gradient-to-r from-rose-600 to-orange-500 px-1.5 py-0.5 text-[8px] font-black tracking-wide text-white shadow-md shadow-rose-200/60 sm:bottom-3 sm:right-3 sm:px-3 sm:py-1.5 sm:text-xs sm:shadow-lg">
                         {product.discountPercent}% OFF
                       </span>
                     ) : null}
@@ -381,35 +382,37 @@ export default function WishlistPage() {
                         </p>
 
                         <div className="mt-4 flex items-center justify-between gap-2">
-                          <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                            {product.discountPercent && product.discountPercent > 0 ? (
-                              <>
-                                <span className="text-base font-black tracking-tight text-rose-600 sm:text-lg">
-                                  {formatPrice(getDiscountedPrice(product.price, product.discountPercent))}
-                                </span>
-                                <span className="text-xs font-semibold text-slate-400 line-through">
-                                  {formatPrice(product.price)}
-                                </span>
-                              </>
-                            ) : (
-                              <span className="text-base font-black tracking-tight text-indigo-600 sm:text-lg">
-                                {formatPrice(product.price)}
-                              </span>
-                            )}
-                          </div>
-                          <span
-  className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[9px] font-bold sm:text-[10px] ${
-    product.stock > 0 ? "text-emerald-600" : "text-rose-500"
-  }`}
->
+  <div className="flex min-w-0 flex-col items-start gap-0 sm:flex-row sm:items-baseline sm:gap-x-2">
+    {product.discountPercent && product.discountPercent > 0 ? (
+      <>
+        <span className="whitespace-nowrap text-base font-black tracking-tight text-rose-600 sm:text-lg">
+          {formatPrice(getDiscountedPrice(product.price, product.discountPercent))}
+        </span>
+
+        <span className="whitespace-nowrap text-[10px] font-semibold text-slate-400 line-through sm:text-xs">
+          {formatPrice(product.price)}
+        </span>
+      </>
+    ) : (
+      <span className="whitespace-nowrap text-base font-black tracking-tight text-indigo-600 sm:text-lg">
+        {formatPrice(product.price)}
+      </span>
+    )}
+  </div>
+
   <span
-    className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-      product.stock > 0 ? "bg-emerald-500" : "bg-rose-500"
+    className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[9px] font-bold sm:text-[10px] ${
+      product.stock > 0 ? "text-emerald-600" : "text-rose-500"
     }`}
-  />
-  {product.stock > 0 ? "In Stock" : "Unavailable"}
-</span>
-                        </div>
+  >
+    <span
+      className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+        product.stock > 0 ? "bg-emerald-500" : "bg-rose-500"
+      }`}
+    />
+    {product.stock > 0 ? "In Stock" : "Unavailable"}
+  </span>
+</div>
 
                         <button
                           type="button"

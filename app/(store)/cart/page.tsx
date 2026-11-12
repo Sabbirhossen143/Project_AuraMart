@@ -330,20 +330,22 @@ const loadCart = useCallback(async () => {
             and find something you'll love.
           </p>
 
-          <Link
-  href="/#products"
-  className="premium-button mt-7 inline-flex h-12 items-center justify-center gap-2 rounded-full bg-indigo-600 px-7 text-sm font-bold !text-white shadow-lg shadow-indigo-200 hover:bg-indigo-700"
->
-  Start Shopping <ArrowRight size={17} />
-</Link>
+          <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
+  <Link
+    href="/#products"
+    className="premium-button inline-flex h-11 w-full max-w-[220px] items-center justify-center gap-2 rounded-full bg-indigo-600 px-7 text-sm font-bold !text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 sm:w-auto"
+  >
+    Start Shopping <ArrowRight size={17} />
+  </Link>
 
-          <Link
-            href="/"
-            className="mt-5 inline-flex items-center gap-2 text-xs font-semibold text-slate-500 transition hover:text-indigo-600"
-          >
-            <ArrowLeft size={14} />
-            Back to Home
-          </Link>
+  <Link
+    href="/"
+    className="inline-flex h-11 w-full max-w-[220px] items-center justify-center gap-2 rounded-full border border-slate-300 bg-transparent px-7 text-sm font-semibold text-slate-600 transition hover:border-indigo-500 hover:text-indigo-600 sm:w-auto"
+  >
+    <ArrowLeft size={14} />
+    Back to Home
+  </Link>
+</div>
         </div>
       </section>
     );
@@ -353,27 +355,27 @@ const loadCart = useCallback(async () => {
     <section className="min-h-screen bg-[radial-gradient(ellipse_at_top,_rgba(99,102,241,0.09),_transparent_38%),linear-gradient(180deg,#f8faff_0%,#f1f5f9_100%)] px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
       <div className="mx-auto max-w-7xl">
         {/* PAGE HEADING */}
-        <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-          <div>
-            <div className="mb-3 inline-flex items-center gap-2 text-xs font-bold text-indigo-600">
-              <ShoppingCart size={15} />
-              YOUR SHOPPING BAG
-            </div>
+<div className="mb-6 flex items-center justify-between gap-2 sm:mb-8">
+  <div className="min-w-0">
+    <div className="mb-2 inline-flex items-center gap-1.5 text-[10px] font-bold text-indigo-600 sm:mb-3 sm:gap-2 sm:text-xs">
+      <ShoppingCart size={13} className="sm:h-[15px] sm:w-[15px]" />
+      YOUR SHOPPING BAG
+    </div>
 
-            <h1 className="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
-              Shopping Cart
-            </h1>
+    <h1 className="text-2xl font-black tracking-tight text-slate-950 sm:text-4xl">
+      Shopping Cart
+    </h1>
 
-            <p className="mt-2 text-sm text-slate-500">
-              Review your selected products before checkout.
-            </p>
-          </div>
+    <p className="mt-1.5 text-xs text-slate-500 sm:mt-2 sm:text-sm">
+      Review your selected products before checkout.
+    </p>
+  </div>
 
-          <div className="inline-flex w-fit items-center gap-2 rounded-full border border-indigo-100 bg-white px-4 py-2.5 text-xs font-bold text-indigo-600 shadow-sm">
-            <ShoppingBag size={15} />
-            {cart.totalItems} {cart.totalItems === 1 ? "Item" : "Items"}
-          </div>
-        </div>
+  <div className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-indigo-100 bg-white px-3 py-2 text-[10px] font-bold text-indigo-600 shadow-sm sm:gap-2 sm:px-4 sm:py-2.5 sm:text-xs">
+    <ShoppingBag size={13} className="sm:h-[15px] sm:w-[15px]" />
+    {cart.totalItems} {cart.totalItems === 1 ? "Item" : "Items"}
+  </div>
+</div>
 
         {/* BREADCRUMB */}
         <div className="mb-7 flex items-center gap-2 text-xs text-slate-400">
