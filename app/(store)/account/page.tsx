@@ -384,7 +384,7 @@ export default function AccountDashboard() {
               Home
             </Link>
             <ChevronRight size={15} />
-            <span>My Account</span>
+            <span>Dashboard</span>
           </div>
 
           <div className="flex flex-nowrap items-center justify-between gap-2 sm:gap-6">
@@ -559,22 +559,28 @@ export default function AccountDashboard() {
             </Link>
           </div>
 
-          <div className="grid gap-x-8 gap-y-6 p-5 sm:grid-cols-2 sm:p-7">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-4 p-4 sm:grid-cols-2 sm:gap-x-8 sm:gap-y-6 sm:p-7">
             {[
               { label: "Full Name", value: profile.name },
-              { label: "Email Address", value: profile.email },
+              { label: "Email Address", value: profile.email, fullWidth: true },
               { label: "Phone Number", value: profile.phone },
-              { label: "Street Address", value: profile.address },
+              { label: "Street Address", value: profile.address, fullWidth: true },
               { label: "City", value: profile.city },
               { label: "Postal Code", value: profile.postalCode },
               { label: "Country", value: profile.country },
-              { label: "Account Role", value: profile.role },
             ].map((item) => (
-              <div key={item.label} className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              <div key={item.label} className={`min-w-0 ${item.fullWidth ? "col-span-2" : ""}`}>
+
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 sm:text-xs sm:tracking-wider">
                   {item.label}
                 </p>
-                <p className="mt-2 break-words font-semibold text-slate-800">
+                <p
+                  className={`mt-1 text-xs font-semibold text-slate-800 sm:mt-2 sm:text-base ${
+                    item.fullWidth
+                      ? "whitespace-nowrap"
+                      : "line-clamp-2 break-words"
+                  }`}
+                >
                   {item.value?.trim() || (
                     <span className="font-normal italic text-slate-400">
                       Not added yet
@@ -589,7 +595,7 @@ export default function AccountDashboard() {
                 Account Status
               </p>
               <p
-                className={`mt-2 font-semibold ${
+                className={`mt-1 text-xs font-semibold sm:mt-2 sm:text-base ${
                   profile.isActive ? "text-emerald-600" : "text-rose-600"
                 }`}
               >
@@ -717,7 +723,7 @@ export default function AccountDashboard() {
       </p>
     </div>
 
-    <div className="grid grid-cols-2 gap-3 p-3 sm:gap-4 sm:p-7">
+    <div className="grid grid-cols-1 gap-3 p-3 sm:gap-4 sm:p-7">
       <Link
         href="/admin/orders"
         className="premium-card group flex items-center gap-4 rounded-xl border border-slate-200 p-5 transition hover:border-indigo-300 hover:bg-indigo-50/50"
@@ -818,7 +824,7 @@ export default function AccountDashboard() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          <div className="grid grid-cols-1 gap-3 sm:gap-4">
             {menuItems.map((item) => {
               const Icon = item.icon;
 
