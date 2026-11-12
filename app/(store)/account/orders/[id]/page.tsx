@@ -201,13 +201,13 @@ useEffect(() => {
 
           <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
             <div className="min-w-0 flex-1">
-              <p className="text-xs text-indigo-100 sm:text-sm">Order Details</p>
+              <p className="text-sm text-indigo-100 sm:text-base">Order Details</p>
               <div className="mt-1.5 flex min-w-0 items-center gap-2 sm:mt-2 sm:gap-3">
-                <h1 className="min-w-0 break-all text-[11px] font-bold leading-5 sm:text-3xl">
+                <h1 className="min-w-0 break-all text-[12px] font-bold leading-5 sm:text-3xl">
                   #{order.id}
                 </h1>
                 <span
-                  className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-bold sm:hidden ${
+                  className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold sm:hidden ${
                     isCancelled
                       ? "bg-red-100 text-red-700"
                       : "bg-white text-indigo-700"
@@ -216,7 +216,7 @@ useEffect(() => {
                   {order.orderStatus}
                 </span>
               </div>
-              <p className="mt-1.5 text-[11px] text-indigo-100 sm:mt-2 sm:text-sm">
+              <p className="mt-1.5 text-[12px] text-indigo-100 sm:mt-2 sm:text-sm">
                 Placed on {formatDate(order.createdAt)}
               </p>
             </div>
