@@ -1,274 +1,349 @@
-import {
-  QueryCommand,
-  TransactWriteCommand,
-} from "@aws-sdk/lib-dynamodb";
 
-import { dynamoDB } from "@/lib/aws/dynamodb";
-import { getProductById } from "@/repositories/product.repository";
-import { getCartItems } from "@/repositories/cart.repository";
+import { randomUUID } from "node:crypto";
+import { Pool, type PoolClient } from "pg";
 
-import type {
-  QueryCommandInput,
-  TransactWriteCommandInput,
-} from "@aws-sdk/lib-dynamodb";
+import type { Order, OrderStatus } from "@/types/order";
 
-import type {
-  Order,
-  OrderRecord,
-} from "@/types/order";
+// ============================================
+// PostgreSQL Connection Pool
+// ============================================
 
-interface ShippingAddress {
-  fullName: string;
-  phone: string;
-  address: string;
-  city: string;
-  postalCode: string;
-  country: string;
+const databaseUrl = process.env.DATABASE_URL;
+
+if (!databaseUrl) {
+  throw new Error("DATABASE_URL is not configured");
 }
 
-const TABLE_NAME = process.env.DYNAMODB_TABLE_NAME!;
+const globalForPg = globalThis as typeof globalThis & {
+  orderPgPool?: Pool;
+};
 
-// Create order from user's cart
+const pool =
+  globalForPg.orderPgPool ??
+  new Pool({
+    connectionString: databaseUrl,
+    max: 5,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+  });
+
+globalForPg.orderPgPool = pool;
+
+// ============================================
+// Database Types
+// ============================================
+
+type OrderRow = {
+  id: string;
+  user_id: string;
+  items: Order["items"];
+  total_items: number;
+  total_amount: string | number;
+  shipping_address: Order["shippingAddress"];
+  payment_method: "COD";
+  payment_status: Order["paymentStatus"];
+  order_status: OrderStatus;
+  created_at: Date | string;
+  updated_at: Date | string;
+};
+
+type CartRow = {
+  product_id: string;
+  quantity: number;
+};
+
+type ProductRow = {
+  id: string;
+  name: string;
+  price: string | number;
+  stock: number;
+};
+
+// ============================================
+// Helper Functions
+// ============================================
+
+function mapOrder(row: OrderRow): Order {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    items: row.items,
+    totalItems: Number(row.total_items),
+    totalAmount: Number(row.total_amount),
+    shippingAddress: row.shipping_address,
+    paymentMethod: row.payment_method,
+    paymentStatus: row.payment_status,
+    orderStatus: row.order_status,
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString(),
+  };
+}
+
+async function rollback(client: PoolClient) {
+  try {
+    await client.query("ROLLBACK");
+  } catch (error) {
+    console.error("Transaction rollback failed:", error);
+  }
+}
+
+// ============================================
+// Create Order
+// ============================================
+
 export async function createOrder(
   userId: string,
-  shippingAddress: ShippingAddress
+  shippingAddress: Order["shippingAddress"]
 ): Promise<Order> {
-  const cartItems = await getCartItems(userId);
+  const client = await pool.connect();
 
-  if (cartItems.length === 0) {
-    throw new Error("Your cart is empty.");
+  try {
+    await client.query("BEGIN");
+
+    // Lock cart rows during checkout
+    const cartResult = await client.query<CartRow>(
+      `
+        SELECT product_id, quantity
+        FROM cart_items
+        WHERE user_id = $1
+        ORDER BY product_id
+        FOR UPDATE
+      `,
+      [userId]
+    );
+
+    const cartItems = cartResult.rows;
+
+    if (cartItems.length === 0) {
+      throw new Error("Your cart is empty.");
+    }
+
+    const productIds = cartItems.map(
+      (item) => item.product_id
+    );
+
+    // Lock products and get current prices and stock
+    const productResult = await client.query<ProductRow>(
+      `
+        SELECT id, name, price, stock
+        FROM products
+        WHERE id = ANY($1::uuid[])
+        ORDER BY id
+        FOR UPDATE
+      `,
+      [productIds]
+    );
+
+    const productMap = new Map(
+      productResult.rows.map((product) => [
+        product.id,
+        product,
+      ])
+    );
+
+    // Validate products and stock
+    const items: Order["items"] = cartItems.map(
+      (cartItem) => {
+        const product = productMap.get(
+          cartItem.product_id
+        );
+
+        if (!product) {
+          throw new Error(
+            `Product not found: ${cartItem.product_id}`
+          );
+        }
+
+        if (product.stock < cartItem.quantity) {
+          throw new Error(
+            `Insufficient stock for ${product.name}.`
+          );
+        }
+
+        const priceCents = Math.round(
+          Number(product.price) * 100
+        );
+
+        const subtotalCents =
+          priceCents * cartItem.quantity;
+
+        return {
+          productId: product.id,
+          productName: product.name,
+          quantity: cartItem.quantity,
+          price: priceCents / 100,
+          subtotal: subtotalCents / 100,
+        };
+      }
+    );
+
+    const totalItems = items.reduce(
+      (total, item) => total + item.quantity,
+      0
+    );
+
+    const totalAmountCents = items.reduce(
+      (total, item) =>
+        total + Math.round(item.subtotal * 100),
+      0
+    );
+
+    const totalAmount = totalAmountCents / 100;
+    const orderId = randomUUID();
+
+    // Insert order
+    const orderResult = await client.query<OrderRow>(
+      `
+        INSERT INTO orders (
+          id,
+          user_id,
+          items,
+          total_items,
+          total_amount,
+          shipping_address,
+          payment_method,
+          payment_status,
+          order_status
+        )
+        VALUES (
+          $1,
+          $2,
+          $3::jsonb,
+          $4,
+          $5,
+          $6::jsonb,
+          'COD',
+          'PENDING',
+          'PENDING'
+        )
+        RETURNING *
+      `,
+      [
+        orderId,
+        userId,
+        JSON.stringify(items),
+        totalItems,
+        totalAmount,
+        JSON.stringify(shippingAddress),
+      ]
+    );
+
+    // Deduct product stock
+    for (const item of items) {
+      const stockResult = await client.query(
+        `
+          UPDATE products
+          SET
+            stock = stock - $2,
+            updated_at = NOW()
+          WHERE id = $1
+            AND stock >= $2
+          RETURNING id
+        `,
+        [item.productId, item.quantity]
+      );
+
+      if (stockResult.rowCount !== 1) {
+        throw new Error(
+          `Insufficient stock for ${item.productName}.`
+        );
+      }
+    }
+
+    // Clear user's cart
+    await client.query(
+      `
+        DELETE FROM cart_items
+        WHERE user_id = $1
+          AND product_id = ANY($2::uuid[])
+      `,
+      [userId, productIds]
+    );
+
+    await client.query("COMMIT");
+
+    return mapOrder(orderResult.rows[0]);
+  } catch (error) {
+    await rollback(client);
+    throw error;
+  } finally {
+    client.release();
   }
-
-  const now = new Date().toISOString();
-  const orderId = crypto.randomUUID();
-
-  const items = await Promise.all(
-    cartItems.map(async (cartItem) => {
-      const product = await getProductById(cartItem.productId);
-
-      if (!product) {
-        throw new Error(
-          `Product not found: ${cartItem.productId}`
-        );
-      }
-
-      if (product.stock < cartItem.quantity) {
-        throw new Error(
-          `Insufficient stock for ${product.name}.`
-        );
-      }
-
-      return {
-        productId: product.id,
-        productName: product.name,
-        quantity: cartItem.quantity,
-        price: product.price,
-        subtotal: product.price * cartItem.quantity,
-      };
-    })
-  );
-
-  const totalItems = items.reduce(
-    (total, item) => total + item.quantity,
-    0
-  );
-
-  const totalAmount = items.reduce(
-    (total, item) => total + item.subtotal,
-    0
-  );
-
-  const order: Order = {
-    id: orderId,
-    userId,
-    items,
-    totalItems,
-    totalAmount,
-    shippingAddress,
-    paymentMethod: "COD",
-    paymentStatus: "PENDING",
-    orderStatus: "PENDING",
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  const orderRecord: OrderRecord = {
-    ...order,
-    PK: `USER#${userId}`,
-    SK: `ORDER#${now}#${orderId}`,
-    entityType: "ORDER",
-    GSI1PK: "ORDER_STATUS#PENDING",
-    GSI1SK: `CREATED#${now}#${orderId}`,
-  };
-
-  const transactItems = [
-    {
-      Put: {
-        TableName: TABLE_NAME,
-        Item: orderRecord,
-        ConditionExpression:
-          "attribute_not_exists(PK) AND attribute_not_exists(SK)",
-      },
-    },
-
-    ...items.map((item) => ({
-      Update: {
-        TableName: TABLE_NAME,
-        Key: {
-          PK: `PRODUCT#${item.productId}`,
-          SK: "METADATA",
-        },
-        UpdateExpression:
-          "SET stock = stock - :quantity, updatedAt = :now",
-        ConditionExpression:
-          "attribute_exists(PK) AND stock >= :quantity",
-        ExpressionAttributeValues: {
-          ":quantity": item.quantity,
-          ":now": now,
-        },
-      },
-    })),
-
-    ...cartItems.map((item) => ({
-      Delete: {
-        TableName: TABLE_NAME,
-        Key: {
-          PK: `USER#${userId}`,
-          SK: `CART#PRODUCT#${item.productId}`,
-        },
-        ConditionExpression:
-          "attribute_exists(PK) AND attribute_exists(SK)",
-      },
-    })),
-  ];
-
-  await dynamoDB.send(
-    new TransactWriteCommand({
-      TransactItems: transactItems,
-    })
-  );
-
-  return order;
 }
 
-// Get order by ID
+// ============================================
+// Get Order By ID
+// ============================================
+
 export async function getOrderById(
   userId: string,
   orderId: string
 ): Promise<Order | null> {
-  const result = await dynamoDB.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      KeyConditionExpression:
-        "PK = :pk AND begins_with(SK, :sk)",
-      ExpressionAttributeValues: {
-        ":pk": `USER#${userId}`,
-        ":sk": `ORDER#`,
-      },
-    })
+  const result = await pool.query<OrderRow>(
+    `
+      SELECT *
+      FROM orders
+      WHERE id = $1
+        AND user_id = $2
+      LIMIT 1
+    `,
+    [orderId, userId]
   );
 
-  const orders = (result.Items || []) as OrderRecord[];
-
-  const order = orders.find((item) => item.id === orderId);
-
-  if (!order) {
+  if (result.rows.length === 0) {
     return null;
   }
 
-  const {
-    PK,
-    SK,
-    entityType,
-    GSI1PK,
-    GSI1SK,
-    ...orderData
-  } = order;
-
-  return orderData;
+  return mapOrder(result.rows[0]);
 }
 
-// Get all orders of a user
+// ============================================
+// Get All Orders Of A User
+// ============================================
+
 export async function getUserOrders(
   userId: string
 ): Promise<Order[]> {
-  const result = await dynamoDB.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      KeyConditionExpression:
-        "PK = :pk AND begins_with(SK, :sk)",
-      ExpressionAttributeValues: {
-        ":pk": `USER#${userId}`,
-        ":sk": "ORDER#",
-      },
-      ScanIndexForward: false,
-    })
+  const result = await pool.query<OrderRow>(
+    `
+      SELECT *
+      FROM orders
+      WHERE user_id = $1
+      ORDER BY created_at DESC
+    `,
+    [userId]
   );
 
-  const records = (result.Items || []) as OrderRecord[];
-
-  return records.map(
-    ({ PK, SK, entityType, GSI1PK, GSI1SK, ...order }) => order
-  );
+  return result.rows.map(mapOrder);
 }
 
-// Get all orders for admin
+// ============================================
+// Get All Orders For Admin
+// ============================================
+
 export async function getAllOrders(): Promise<Order[]> {
-  const statuses: Order["orderStatus"][] = [
-    "PENDING",
-    "CONFIRMED",
-    "PROCESSING",
-    "SHIPPED",
-    "DELIVERED",
-    "CANCELLED",
-  ];
+  const result = await pool.query<OrderRow>(
+    `
+      SELECT *
+      FROM orders
+      ORDER BY created_at DESC
+    `
+  );
 
-  const allOrders: OrderRecord[] = [];
-
-  for (const status of statuses) {
-    let lastEvaluatedKey: QueryCommandInput["ExclusiveStartKey"];
-
-    do {
-      const result = await dynamoDB.send(
-        new QueryCommand({
-          TableName: TABLE_NAME,
-          IndexName: "GSI1",
-          KeyConditionExpression: "GSI1PK = :pk",
-          ExpressionAttributeValues: {
-            ":pk": `ORDER_STATUS#${status}`,
-          },
-          ScanIndexForward: false,
-          ExclusiveStartKey: lastEvaluatedKey,
-        })
-      );
-
-      allOrders.push(
-        ...((result.Items || []) as OrderRecord[])
-      );
-
-      lastEvaluatedKey = result.LastEvaluatedKey;
-    } while (lastEvaluatedKey);
-  }
-
-  return allOrders
-    .sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() -
-        new Date(a.createdAt).getTime()
-    )
-    .map(
-      ({ PK, SK, entityType, GSI1PK, GSI1SK, ...order }) =>
-        order
-    );
+  return result.rows.map(mapOrder);
 }
+
+// ============================================
+// Update Order Status
+// ============================================
 
 export async function updateOrderStatus(
   orderId: string,
-  status: Order["orderStatus"]
+  status: OrderStatus
 ): Promise<Order> {
   const allowedTransitions: Record<
-    Order["orderStatus"],
-    Order["orderStatus"][]
+    OrderStatus,
+    OrderStatus[]
   > = {
     PENDING: ["CONFIRMED", "CANCELLED"],
     CONFIRMED: ["PROCESSING", "CANCELLED"],
@@ -278,232 +353,166 @@ export async function updateOrderStatus(
     CANCELLED: [],
   };
 
-  const statuses: Order["orderStatus"][] = [
-    "PENDING",
-    "CONFIRMED",
-    "PROCESSING",
-    "SHIPPED",
-    "DELIVERED",
-    "CANCELLED",
-  ];
+  const client = await pool.connect();
 
-  let order: OrderRecord | undefined;
+  try {
+    await client.query("BEGIN");
 
-  // Find order by current status with pagination
-  for (const currentStatus of statuses) {
-    let lastEvaluatedKey: QueryCommandInput["ExclusiveStartKey"];
+    // Lock order to prevent concurrent status updates
+    const orderResult = await client.query<OrderRow>(
+      `
+        SELECT *
+        FROM orders
+        WHERE id = $1
+        FOR UPDATE
+      `,
+      [orderId]
+    );
 
-    do {
-      const result = await dynamoDB.send(
-        new QueryCommand({
-          TableName: TABLE_NAME,
-          IndexName: "GSI1",
-          KeyConditionExpression: "GSI1PK = :pk",
-          ExpressionAttributeValues: {
-            ":pk": `ORDER_STATUS#${currentStatus}`,
-          },
-          ExclusiveStartKey: lastEvaluatedKey,
-        })
+    if (orderResult.rows.length === 0) {
+      throw new Error("Order not found.");
+    }
+
+    const order = mapOrder(orderResult.rows[0]);
+    const currentStatus = order.orderStatus;
+
+    if (!allowedTransitions[currentStatus].includes(status)) {
+      throw new Error(
+        `Invalid order status transition: ${currentStatus} -> ${status}.`
+      );
+    }
+
+    // Restore stock when an order is cancelled
+    if (status === "CANCELLED") {
+      const productIds = order.items.map(
+        (item) => item.productId
       );
 
-      order = (result.Items || []).find(
-        (item) => item.id === orderId
-      ) as OrderRecord | undefined;
-
-      lastEvaluatedKey = result.LastEvaluatedKey;
-
-      if (order) break;
-    } while (lastEvaluatedKey);
-
-    if (order) break;
-  }
-
-  if (!order) {
-    throw new Error("Order not found.");
-  }
-
-  const currentStatus = order.orderStatus;
-
-  // Validate status transition
-  if (!allowedTransitions[currentStatus].includes(status)) {
-    throw new Error(
-      `Invalid order status transition: ${currentStatus} -> ${status}.`
-    );
-  }
-
-  const updatedAt = new Date().toISOString();
-
-  const transactItems: NonNullable<
-  TransactWriteCommandInput["TransactItems"]
-> = [
-    {
-      Update: {
-        TableName: TABLE_NAME,
-        Key: {
-          PK: order.PK,
-          SK: order.SK,
-        },
-        UpdateExpression: `
-          SET
-            orderStatus = :status,
-            GSI1PK = :gsi1pk,
-            updatedAt = :updatedAt
+      const productResult = await client.query<{
+        id: string;
+      }>(
+        `
+          SELECT id
+          FROM products
+          WHERE id = ANY($1::uuid[])
+          ORDER BY id
+          FOR UPDATE
         `,
-        ConditionExpression: "orderStatus = :currentStatus",
-        ExpressionAttributeValues: {
-          ":status": status,
-          ":gsi1pk": `ORDER_STATUS#${status}`,
-          ":updatedAt": updatedAt,
-          ":currentStatus": currentStatus,
-        },
-      },
-    },
-  ];
+        [productIds]
+      );
 
-  // Restore stock when an order is cancelled
-  if (status === "CANCELLED") {
-    for (const item of order.items) {
-      transactItems.push({
-        Update: {
-          TableName: TABLE_NAME,
-          Key: {
-            PK: `PRODUCT#${item.productId}`,
-            SK: "METADATA",
-          },
-          UpdateExpression:
-            "SET stock = stock + :quantity, updatedAt = :updatedAt",
-          ConditionExpression: "attribute_exists(PK)",
-          ExpressionAttributeValues: {
-            ":quantity": item.quantity,
-            ":updatedAt": updatedAt,
-          },
-        },
-      });
+      const existingProducts = new Set(
+        productResult.rows.map((product) => product.id)
+      );
+
+      for (const item of order.items) {
+        if (!existingProducts.has(item.productId)) {
+          throw new Error(
+            `Product not found: ${item.productId}`
+          );
+        }
+      }
+
+      for (const item of order.items) {
+        await client.query(
+          `
+            UPDATE products
+            SET
+              stock = stock + $2,
+              updated_at = NOW()
+            WHERE id = $1
+          `,
+          [item.productId, item.quantity]
+        );
+      }
     }
+
+    // Update order status
+    const updateResult = await client.query<OrderRow>(
+      `
+        UPDATE orders
+        SET
+          order_status = $2,
+          updated_at = NOW()
+        WHERE id = $1
+        RETURNING *
+      `,
+      [orderId, status]
+    );
+
+    await client.query("COMMIT");
+
+    return mapOrder(updateResult.rows[0]);
+  } catch (error) {
+    await rollback(client);
+    throw error;
+  } finally {
+    client.release();
   }
-
-  await dynamoDB.send(
-    new TransactWriteCommand({
-      TransactItems: transactItems,
-    })
-  );
-
-  const {
-    PK,
-    SK,
-    entityType,
-    GSI1PK,
-    GSI1SK,
-    ...orderData
-  } = order;
-
-  return {
-    ...orderData,
-    orderStatus: status,
-    updatedAt,
-  };
 }
+
+// ============================================
+// Mark COD Payment As Paid
+// ============================================
 
 export async function markCodPaymentAsPaid(
   orderId: string
 ): Promise<Order> {
-  const statuses: Order["orderStatus"][] = [
-    "PENDING",
-    "CONFIRMED",
-    "PROCESSING",
-    "SHIPPED",
-    "DELIVERED",
-    "CANCELLED",
-  ];
+  const client = await pool.connect();
 
-  let order: OrderRecord | undefined;
+  try {
+    await client.query("BEGIN");
 
-  // Find order using GSI1 with pagination
-  for (const currentStatus of statuses) {
-    let lastEvaluatedKey: Record<string, unknown> | undefined;
+    // Lock order to prevent duplicate payment updates
+    const orderResult = await client.query<OrderRow>(
+      `
+        SELECT *
+        FROM orders
+        WHERE id = $1
+        FOR UPDATE
+      `,
+      [orderId]
+    );
 
-    do {
-      const result = await dynamoDB.send(
-        new QueryCommand({
-          TableName: TABLE_NAME,
-          IndexName: "GSI1",
-          KeyConditionExpression: "GSI1PK = :pk",
-          ExpressionAttributeValues: {
-            ":pk": `ORDER_STATUS#${currentStatus}`,
-          },
-          ExclusiveStartKey: lastEvaluatedKey,
-        })
+    if (orderResult.rows.length === 0) {
+      throw new Error("Order not found.");
+    }
+
+    const order = mapOrder(orderResult.rows[0]);
+
+    if (order.paymentMethod !== "COD") {
+      throw new Error("Only COD orders can be accepted.");
+    }
+
+    if (order.orderStatus !== "DELIVERED") {
+      throw new Error(
+        "Only delivered orders can be marked as paid."
       );
+    }
 
-      order = (result.Items || []).find(
-        (item) => item.id === orderId
-      ) as OrderRecord | undefined;
+    if (order.paymentStatus !== "PENDING") {
+      throw new Error("Payment is already processed.");
+    }
 
-      if (order) break;
+    const updateResult = await client.query<OrderRow>(
+      `
+        UPDATE orders
+        SET
+          payment_status = 'PAID',
+          updated_at = NOW()
+        WHERE id = $1
+        RETURNING *
+      `,
+      [orderId]
+    );
 
-      lastEvaluatedKey = result.LastEvaluatedKey;
-    } while (lastEvaluatedKey);
+    await client.query("COMMIT");
 
-    if (order) break;
+    return mapOrder(updateResult.rows[0]);
+  } catch (error) {
+    await rollback(client);
+    throw error;
+  } finally {
+    client.release();
   }
-
-  if (!order) {
-    throw new Error("Order not found.");
-  }
-
-  if (order.paymentMethod !== "COD") {
-    throw new Error("Only COD orders can be accepted.");
-  }
-
-  if (order.orderStatus !== "DELIVERED") {
-    throw new Error("Only delivered orders can be marked as paid.");
-  }
-
-  if (order.paymentStatus !== "PENDING") {
-    throw new Error("Payment is already processed.");
-  }
-
-  const updatedAt = new Date().toISOString();
-
-  await dynamoDB.send(
-    new TransactWriteCommand({
-      TransactItems: [
-        {
-          Update: {
-            TableName: TABLE_NAME,
-            Key: {
-              PK: order.PK,
-              SK: order.SK,
-            },
-            UpdateExpression:
-              "SET paymentStatus = :paid, updatedAt = :updatedAt",
-            ConditionExpression:
-              "paymentMethod = :cod AND orderStatus = :delivered AND paymentStatus = :pending",
-            ExpressionAttributeValues: {
-              ":paid": "PAID",
-              ":pending": "PENDING",
-              ":cod": "COD",
-              ":delivered": "DELIVERED",
-              ":updatedAt": updatedAt,
-            },
-          },
-        },
-      ],
-    })
-  );
-
-  const {
-    PK,
-    SK,
-    entityType,
-    GSI1PK,
-    GSI1SK,
-    ...orderData
-  } = order;
-
-  return {
-    ...orderData,
-    paymentStatus: "PAID",
-    updatedAt,
-  };
 }

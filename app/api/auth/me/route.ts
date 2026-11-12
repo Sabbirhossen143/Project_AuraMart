@@ -1,17 +1,15 @@
 
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 
 import { authOptions } from "@/lib/auth/options";
-import { getUserById } from "@/repositories/user.repository";
-import { dynamoDB } from "@/lib/aws/dynamodb";
-
-const TABLE_NAME = process.env.DYNAMODB_TABLE_NAME!;
+import {
+  getUserById,
+  updateUserProfile,
+} from "@/repositories/user.repository";
 
 export async function GET() {
   try {
-    // Verify authentication
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
@@ -24,7 +22,6 @@ export async function GET() {
       );
     }
 
-    // Get current user from database
     const user = await getUserById(session.user.id);
 
     if (!user || !user.isActive) {
@@ -37,14 +34,8 @@ export async function GET() {
       );
     }
 
-    // Exclude password and internal database fields
-    const {
-      password,
-      PK,
-      SK,
-      entityType,
-      ...safeUser
-    } = user;
+    // Exclude password
+    const { password, ...safeUser } = user;
 
     return NextResponse.json({
       success: true,
@@ -62,7 +53,6 @@ export async function GET() {
     );
   }
 }
-
 
 export async function PATCH(request: Request) {
   try {
@@ -101,8 +91,6 @@ export async function PATCH(request: Request) {
       );
     }
 
-    // Only editable personal information is accepted.
-    // Email, role, isActive and password are never updated here.
     const name = typeof body.name === "string" ? body.name.trim() : "";
     const phone = typeof body.phone === "string" ? body.phone.trim() : "";
     const address =
@@ -112,7 +100,12 @@ export async function PATCH(request: Request) {
       typeof body.postalCode === "string" ? body.postalCode.trim() : "";
     const country =
       typeof body.country === "string" ? body.country.trim() : "";
-    const hasProfileImage = Object.prototype.hasOwnProperty.call(body, "profileImage");
+
+    const hasProfileImage = Object.prototype.hasOwnProperty.call(
+      body,
+      "profileImage"
+    );
+
     const profileImage =
       typeof body.profileImage === "string" ? body.profileImage : "";
 
@@ -146,48 +139,29 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const updateExpression = hasProfileImage
-      ? "SET #name = :name, phone = :phone, #address = :address, city = :city, postalCode = :postalCode, country = :country, profileImage = :profileImage, updatedAt = :updatedAt"
-      : "SET #name = :name, phone = :phone, #address = :address, city = :city, postalCode = :postalCode, country = :country, updatedAt = :updatedAt";
+    const updated = await updateUserProfile(session.user.id, {
+      name,
+      phone,
+      address,
+      city,
+      postalCode,
+      country,
+      ...(hasProfileImage
+        ? { profileImage: profileImage || null }
+        : {}),
+    });
 
-    const expressionValues: Record<string, unknown> = {
-      ":name": name,
-      ":phone": phone,
-      ":address": address,
-      ":city": city,
-      ":postalCode": postalCode,
-      ":country": country,
-      ":updatedAt": new Date().toISOString(),
-      ":active": true,
-    };
-    if (hasProfileImage) expressionValues[":profileImage"] = profileImage || null;
-
-    const result = await dynamoDB.send(
-      new UpdateCommand({
-        TableName: TABLE_NAME,
-        Key: {
-          PK: `USER#${session.user.id}`,
-          SK: "PROFILE",
+    if (!updated) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "User account not found or inactive.",
         },
-        UpdateExpression: updateExpression,
-        ExpressionAttributeNames: {
-          "#name": "name",
-          "#address": "address",
-        },
-        ExpressionAttributeValues: expressionValues,
-        ConditionExpression: "attribute_exists(PK) AND isActive = :active",
-        ReturnValues: "ALL_NEW",
-      })
-    );
+        { status: 401 }
+      );
+    }
 
-    const updated = result.Attributes ?? {};
-    const {
-      password,
-      PK,
-      SK,
-      entityType,
-      ...safeUser
-    } = updated as Record<string, unknown>;
+    const { password, ...safeUser } = updated;
 
     return NextResponse.json({
       success: true,

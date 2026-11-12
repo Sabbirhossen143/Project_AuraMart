@@ -1,6 +1,6 @@
+
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { ConditionalCheckFailedException } from "@aws-sdk/client-dynamodb";
 import { z } from "zod";
 
 import { authOptions } from "@/lib/auth/options";
@@ -13,6 +13,15 @@ import {
 const wishlistSchema = z.object({
   productId: z.string().uuid("Invalid product ID."),
 });
+
+// Check PostgreSQL duplicate key error
+function isDuplicateError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    error.code === "23505"
+  );
+}
 
 // GET: Get user's wishlist
 export async function GET() {
@@ -37,7 +46,10 @@ export async function GET() {
     console.error("Get Wishlist Error:", error);
 
     return NextResponse.json(
-      { success: false, message: "Failed to retrieve wishlist." },
+      {
+        success: false,
+        message: "Failed to retrieve wishlist.",
+      },
       { status: 500 }
     );
   }
@@ -93,11 +105,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (
-      error instanceof ConditionalCheckFailedException ||
-      (error instanceof Error &&
-        error.name === "ConditionalCheckFailedException")
-    ) {
+    if (isDuplicateError(error)) {
       return NextResponse.json(
         {
           success: false,
@@ -110,7 +118,10 @@ export async function POST(request: NextRequest) {
     console.error("Add to Wishlist Error:", error);
 
     return NextResponse.json(
-      { success: false, message: "Failed to add product to wishlist." },
+      {
+        success: false,
+        message: "Failed to add product to wishlist.",
+      },
       { status: 500 }
     );
   }
@@ -150,12 +161,11 @@ export async function DELETE(request: NextRequest) {
     });
   } catch (error) {
     if (
-      error instanceof ConditionalCheckFailedException ||
-      (error instanceof Error &&
-        error.name === "ConditionalCheckFailedException")
+      error instanceof Error &&
+      error.message === "Wishlist item not found."
     ) {
       return NextResponse.json(
-        { success: false, message: "Wishlist item not found." },
+        { success: false, message: error.message },
         { status: 404 }
       );
     }
@@ -163,7 +173,10 @@ export async function DELETE(request: NextRequest) {
     console.error("Remove from Wishlist Error:", error);
 
     return NextResponse.json(
-      { success: false, message: "Failed to remove product from wishlist." },
+      {
+        success: false,
+        message: "Failed to remove product from wishlist.",
+      },
       { status: 500 }
     );
   }

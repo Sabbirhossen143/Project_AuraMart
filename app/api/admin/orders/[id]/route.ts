@@ -92,26 +92,6 @@ export async function PATCH(
       }
     }
 
-    // DynamoDB transaction conflict or conditional check failure
-    if (
-      error &&
-      typeof error === "object" &&
-      "name" in error &&
-      (
-        error.name === "TransactionCanceledException" ||
-        error.name === "ConditionalCheckFailedException"
-      )
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "Order update conflict. Please refresh and try again.",
-        },
-        { status: 409 }
-      );
-    }
-
     console.error("Update Order Status Error:", error);
 
     return NextResponse.json(

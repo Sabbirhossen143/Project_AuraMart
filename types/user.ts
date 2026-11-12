@@ -6,14 +6,17 @@ export interface User {
   password: string;
   role: "USER" | "ADMIN";
   isActive: boolean;
+
+  // Profile information
+  phone?: string | null;
+  address?: string | null;
+  city?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
+  profileImage?: string | null;
+
   createdAt: string;
   updatedAt: string;
-}
-
-export interface UserRecord extends User {
-  PK: string;
-  SK: string;
-  entityType: "USER";
 }
 
 export type SafeUser = Omit<User, "password">;

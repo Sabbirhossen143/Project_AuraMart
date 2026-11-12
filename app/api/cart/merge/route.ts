@@ -1,18 +1,26 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import {
-  GetCommand,
-  TransactWriteCommand,
-} from "@aws-sdk/lib-dynamodb";
+import { Pool } from "pg";
 import { z } from "zod";
 
 import { authOptions } from "@/lib/auth/options";
-import { dynamoDB } from "@/lib/aws/dynamodb";
-import { getProductById } from "@/repositories/product.repository";
 import { getCartSummary } from "@/repositories/cart.repository";
 
-const TABLE_NAME = process.env.DYNAMODB_TABLE_NAME!;
+const globalForPg = globalThis as typeof globalThis & {
+  auraCartMergePool?: Pool;
+};
+
+const pool =
+  globalForPg.auraCartMergePool ??
+  new Pool({
+    connectionString: process.env.DATABASE_URL,
+    max: 5,
+  });
+
+if (process.env.NODE_ENV !== "production") {
+  globalForPg.auraCartMergePool = pool;
+}
 
 const mergeCartSchema = z.object({
   mergeId: z.string().uuid(),
@@ -24,7 +32,19 @@ const mergeCartSchema = z.object({
   ).max(99),
 });
 
+class MergeError extends Error {
+  constructor(
+    message: string,
+    public status: number
+  ) {
+    super(message);
+    this.name = "MergeError";
+  }
+}
+
 export async function POST(request: NextRequest) {
+  let client;
+
   try {
     const session = await getServerSession(authOptions);
 
@@ -49,11 +69,6 @@ export async function POST(request: NextRequest) {
     const { mergeId, items } = validation.data;
     const userId = session.user.id;
 
-    const mergeKey = {
-      PK: `USER#${userId}`,
-      SK: `CART_MERGE#${mergeId}`,
-    };
-
     // Combine duplicate product IDs
     const mergedItems = Array.from(
       items.reduce((map, item) => {
@@ -75,124 +90,96 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Prepare transaction
-    const now = new Date().toISOString();
+    client = await pool.connect();
 
-    const transactionItems = [];
+    await client.query("BEGIN");
 
-    // Save merge confirmation in the same transaction
-    transactionItems.push({
-      Put: {
-        TableName: TABLE_NAME,
-        Item: {
-          ...mergeKey,
-          entityType: "CART_MERGE",
-          mergeId,
-          createdAt: now,
-        },
-        ConditionExpression:
-          "attribute_not_exists(PK) AND attribute_not_exists(SK)",
-      },
-    });
+    // Prevent duplicate cart merge
+    const mergeResult = await client.query(
+      `INSERT INTO cart_merges (user_id, merge_id)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id, merge_id) DO NOTHING
+       RETURNING merge_id`,
+      [userId, mergeId]
+    );
 
-    for (const item of mergedItems) {
-      const product = await getProductById(item.productId);
+    // Already merged: do not add quantities again
+    if (mergeResult.rowCount === 0) {
+      await client.query("COMMIT");
 
-      if (!product) {
-        return NextResponse.json(
-          { success: false, message: "Product not found." },
-          { status: 404 }
-        );
-      }
+      const cart = await getCartSummary(userId);
 
-      if (product.stock <= 0) {
-        return NextResponse.json(
-          { success: false, message: "Product is out of stock." },
-          { status: 409 }
-        );
-      }
-
-      if (item.quantity > product.stock) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: "Requested quantity exceeds available stock.",
-          },
-          { status: 409 }
-        );
-      }
-
-      transactionItems.push({
-        Update: {
-          TableName: TABLE_NAME,
-          Key: {
-            PK: `USER#${userId}`,
-            SK: `CART#PRODUCT#${item.productId}`,
-          },
-          UpdateExpression: `
-            SET
-              productId = :productId,
-              quantity = if_not_exists(quantity, :zero) + :quantity,
-              addedAt = if_not_exists(addedAt, :now),
-              updatedAt = :now,
-              entityType = :entityType
-          `,
-          ConditionExpression:
-            "attribute_not_exists(quantity) OR quantity <= :maxExisting",
-          ExpressionAttributeValues: {
-            ":productId": item.productId,
-            ":zero": 0,
-            ":quantity": item.quantity,
-            ":maxExisting": product.stock - item.quantity,
-            ":now": now,
-            ":entityType": "CART",
-          },
-        },
+      return NextResponse.json({
+        success: true,
+        message: "Guest cart was already merged.",
+        data: cart,
       });
     }
 
-    try {
-      await dynamoDB.send(
-        new TransactWriteCommand({
-          TransactItems: transactionItems,
-        })
-      );
-    } catch (error) {
-      // Check whether this merge was already completed
-      const existingMerge = await dynamoDB.send(
-        new GetCommand({
-          TableName: TABLE_NAME,
-          Key: mergeKey,
-          ConsistentRead: true,
-        })
+    // Process each product inside the same transaction
+    for (const item of mergedItems) {
+      // Lock product row to prevent concurrent stock changes
+      const productResult = await client.query(
+        `SELECT id, stock
+         FROM products
+         WHERE id = $1
+         FOR UPDATE`,
+        [item.productId]
       );
 
-      if (existingMerge.Item) {
-        const cart = await getCartSummary(userId);
-
-        return NextResponse.json({
-          success: true,
-          message: "Guest cart was already merged.",
-          data: cart,
-        });
+      if (productResult.rowCount === 0) {
+        throw new MergeError("Product not found.", 404);
       }
 
-      if (
-        error instanceof Error &&
-        error.name === "TransactionCanceledException"
-      ) {
-        return NextResponse.json(
-          {
-            success: false,
-            message:
-              "Cart merge failed. Please check product availability and try again.",
-          },
-          { status: 409 }
+      const stock = Number(productResult.rows[0].stock);
+
+      if (stock <= 0) {
+        throw new MergeError(
+          "Product is out of stock.",
+          409
         );
       }
 
-      throw error;
+      if (item.quantity > stock) {
+        throw new MergeError(
+          "Requested quantity exceeds available stock.",
+          409
+        );
+      }
+
+      // Insert or increase existing cart quantity
+      const cartResult = await client.query(
+        `INSERT INTO cart_items (
+           user_id,
+           product_id,
+           quantity,
+           added_at,
+           updated_at
+         )
+         VALUES ($1, $2, $3, NOW(), NOW())
+         ON CONFLICT (user_id, product_id)
+         DO UPDATE SET
+           quantity = cart_items.quantity + EXCLUDED.quantity,
+           updated_at = NOW()
+         WHERE cart_items.quantity + EXCLUDED.quantity <= $4
+         RETURNING product_id`,
+        [
+          userId,
+          item.productId,
+          item.quantity,
+          stock,
+        ]
+      );
+
+      if (cartResult.rowCount === 0) {
+        throw new MergeError(
+          "Requested quantity exceeds available stock.",
+          409
+        );
+      }
     }
+
+    await client.query("COMMIT");
 
     const cart = await getCartSummary(userId);
 
@@ -201,8 +188,27 @@ export async function POST(request: NextRequest) {
       message: "Guest cart merged successfully.",
       data: cart,
     });
+
   } catch (error) {
     console.error("Guest cart merge error:", error);
+
+    if (client) {
+      try {
+        await client.query("ROLLBACK");
+      } catch (rollbackError) {
+        console.error("Cart merge rollback error:", rollbackError);
+      }
+    }
+
+    if (error instanceof MergeError) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: error.message,
+        },
+        { status: error.status }
+      );
+    }
 
     return NextResponse.json(
       {
@@ -211,5 +217,8 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     );
+
+  } finally {
+    client?.release();
   }
 }

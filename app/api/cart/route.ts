@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
+
 import { authOptions } from "@/lib/auth/options";
 import {
   getCartSummary,
@@ -15,6 +16,14 @@ const addToCartSchema = z.object({
   quantity: z.number().int().positive().max(99),
 });
 
+const updateCartSchema = z.object({
+  productId: z.string().uuid(),
+  quantity: z.number().int().positive().max(99),
+});
+
+const removeCartSchema = z.object({
+  productId: z.string().uuid(),
+});
 
 // GET USER CART
 export async function GET() {
@@ -66,7 +75,6 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-
     const validation = addToCartSchema.safeParse(body);
 
     if (!validation.success) {
@@ -117,18 +125,6 @@ export async function POST(request: NextRequest) {
           { status: 409 }
         );
       }
-
-      if (
-        error.name === "ConditionalCheckFailedException"
-      ) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: "Requested quantity exceeds available stock.",
-          },
-          { status: 409 }
-        );
-      }
     }
 
     return NextResponse.json(
@@ -140,12 +136,6 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
-
-const updateCartSchema = z.object({
-  productId: z.string().uuid(),
-  quantity: z.number().int().positive().max(99),
-});
 
 // UPDATE CART ITEM
 export async function PATCH(request: NextRequest) {
@@ -191,7 +181,10 @@ export async function PATCH(request: NextRequest) {
     console.error("Update cart error:", error);
 
     if (error instanceof Error) {
-      if (error.message === "Product not found.") {
+      if (
+        error.message === "Product not found." ||
+        error.message === "Cart item not found."
+      ) {
         return NextResponse.json(
           { success: false, message: error.message },
           { status: 404 }
@@ -207,18 +200,6 @@ export async function PATCH(request: NextRequest) {
           { status: 409 }
         );
       }
-
-      if (
-        error.name === "ConditionalCheckFailedException"
-      ) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: "Cart item not found.",
-          },
-          { status: 404 }
-        );
-      }
     }
 
     return NextResponse.json(
@@ -227,11 +208,6 @@ export async function PATCH(request: NextRequest) {
     );
   }
 }
-
-
-const removeCartSchema = z.object({
-  productId: z.string().uuid(),
-});
 
 // REMOVE CART ITEM
 export async function DELETE(request: NextRequest) {
@@ -272,10 +248,10 @@ export async function DELETE(request: NextRequest) {
 
     if (
       error instanceof Error &&
-      error.name === "ConditionalCheckFailedException"
+      error.message === "Cart item not found."
     ) {
       return NextResponse.json(
-        { success: false, message: "Cart item not found." },
+        { success: false, message: error.message },
         { status: 404 }
       );
     }
@@ -286,4 +262,3 @@ export async function DELETE(request: NextRequest) {
     );
   }
 }
-

@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
@@ -6,7 +7,7 @@ import { authOptions } from "@/lib/auth/options";
 import { markCodPaymentAsPaid } from "@/repositories/order.repository";
 
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -61,24 +62,6 @@ export async function POST(
           { status: 409 }
         );
       }
-    }
-
-    if (
-      error &&
-      typeof error === "object" &&
-      "name" in error &&
-      (
-        error.name === "TransactionCanceledException" ||
-        error.name === "ConditionalCheckFailedException"
-      )
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Payment update conflict. Please refresh and try again.",
-        },
-        { status: 409 }
-      );
     }
 
     console.error("Accept COD Payment Error:", error);

@@ -1,33 +1,25 @@
-import {
-  DeleteCommand,
-  PutCommand,
-  QueryCommand,
-} from "@aws-sdk/lib-dynamodb";
 
-import { dynamoDB } from "@/lib/aws/dynamodb";
+import { sql } from "@/lib/db";
 import { getProductById } from "@/repositories/product.repository";
-
 import type { WishlistItem } from "@/types/wishlist";
-
-const TABLE_NAME = process.env.DYNAMODB_TABLE_NAME!;
 
 // Get all wishlist items of a user
 export async function getWishlistItems(
   userId: string
 ): Promise<WishlistItem[]> {
-  const result = await dynamoDB.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      KeyConditionExpression:
-        "PK = :pk AND begins_with(SK, :sk)",
-      ExpressionAttributeValues: {
-        ":pk": `USER#${userId}`,
-        ":sk": "WISHLIST#PRODUCT#",
-      },
-    })
-  );
+  const rows = await sql`
+    SELECT product_id, added_at
+    FROM wishlist_items
+    WHERE user_id = ${userId}
+    ORDER BY added_at DESC
+  `;
 
-  return (result.Items || []) as WishlistItem[];
+  return rows.map((row) => ({
+    productId: String(row.product_id),
+    addedAt: new Date(
+      row.added_at as string
+    ).toISOString(),
+  }));
 }
 
 // Add product to wishlist
@@ -41,28 +33,25 @@ export async function addToWishlist(
     throw new Error("Product not found.");
   }
 
-  const now = new Date().toISOString();
-
-  const item = {
-    PK: `USER#${userId}`,
-    SK: `WISHLIST#PRODUCT#${productId}`,
-    entityType: "WISHLIST" as const,
-    productId,
-    addedAt: now,
-  };
-
-  await dynamoDB.send(
-    new PutCommand({
-      TableName: TABLE_NAME,
-      Item: item,
-      ConditionExpression:
-        "attribute_not_exists(PK) AND attribute_not_exists(SK)",
-    })
-  );
+  const rows = await sql`
+    INSERT INTO wishlist_items (
+      user_id,
+      product_id,
+      added_at
+    )
+    VALUES (
+      ${userId},
+      ${productId},
+      NOW()
+    )
+    RETURNING product_id, added_at
+  `;
 
   return {
-    productId: item.productId,
-    addedAt: item.addedAt,
+    productId: String(rows[0].product_id),
+    addedAt: new Date(
+      rows[0].added_at as string
+    ).toISOString(),
   };
 }
 
@@ -71,17 +60,16 @@ export async function removeFromWishlist(
   userId: string,
   productId: string
 ): Promise<string> {
-  await dynamoDB.send(
-    new DeleteCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `USER#${userId}`,
-        SK: `WISHLIST#PRODUCT#${productId}`,
-      },
-      ConditionExpression:
-        "attribute_exists(PK) AND attribute_exists(SK)",
-    })
-  );
+  const rows = await sql`
+    DELETE FROM wishlist_items
+    WHERE user_id = ${userId}
+      AND product_id = ${productId}
+    RETURNING product_id
+  `;
 
-  return productId;
+  if (!rows.length) {
+    throw new Error("Wishlist item not found.");
+  }
+
+  return String(rows[0].product_id);
 }

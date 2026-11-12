@@ -1,68 +1,88 @@
-import {
-  GetCommand,
-  PutCommand,
-  QueryCommand,
-  UpdateCommand,
-  DeleteCommand,
-} from "@aws-sdk/lib-dynamodb";
 
-import { dynamoDB } from "@/lib/aws/dynamodb";
-import type { Category, CategoryRecord } from "@/types/category";
+import { sql } from "@/lib/db";
+import type { Category } from "@/types/category";
 
-const TABLE_NAME = process.env.DYNAMODB_TABLE_NAME!;
+type CategoryRow = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  image: string;
+  is_active: boolean;
+  created_at: string | Date;
+  updated_at: string | Date;
+};
 
-export async function createCategory(category: Category) {
-  const item: CategoryRecord = {
-    PK: "CATEGORY",
-    SK: `CATEGORY#${category.id}`,
-    entityType: "CATEGORY",
-    ...category,
+function mapCategory(row: CategoryRow): Category {
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    description: row.description,
+    image: row.image,
+    isActive: row.is_active,
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString(),
   };
-
-  await dynamoDB.send(
-    new PutCommand({
-      TableName: TABLE_NAME,
-      Item: item,
-      ConditionExpression:
-        "attribute_not_exists(PK) AND attribute_not_exists(SK)",
-    })
-  );
-
-  return item;
 }
 
-export async function getCategoryById(id: string) {
-  const result = await dynamoDB.send(
-    new GetCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: "CATEGORY",
-        SK: `CATEGORY#${id}`,
-      },
-    })
-  );
+// Create Category
+export async function createCategory(
+  category: Category
+): Promise<Category> {
+  const rows = await sql`
+    INSERT INTO categories (
+      id, name, slug, description, image,
+      is_active, created_at, updated_at
+    )
+    VALUES (
+      ${category.id},
+      ${category.name},
+      ${category.slug},
+      ${category.description},
+      ${category.image},
+      ${category.isActive},
+      ${category.createdAt},
+      ${category.updatedAt}
+    )
+    RETURNING *
+  `;
 
-  return (result.Item as CategoryRecord | undefined) ?? null;
+  return mapCategory(rows[0] as CategoryRow);
 }
 
-export async function getAllCategories() {
-  const result = await dynamoDB.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      KeyConditionExpression: "PK = :pk",
-      ExpressionAttributeValues: {
-        ":pk": "CATEGORY",
-      },
-    })
-  );
+// Find Category By ID
+export async function getCategoryById(
+  id: string
+): Promise<Category | null> {
+  const rows = await sql`
+    SELECT *
+    FROM categories
+    WHERE id = ${id}
+    LIMIT 1
+  `;
 
-  return (result.Items as CategoryRecord[] | undefined) ?? [];
+  if (rows.length === 0) return null;
+
+  return mapCategory(rows[0] as CategoryRow);
 }
 
+// Get All Categories
+export async function getAllCategories(): Promise<Category[]> {
+  const rows = await sql`
+    SELECT *
+    FROM categories
+    ORDER BY created_at DESC
+  `;
+
+  return rows.map((row) => mapCategory(row as CategoryRow));
+}
+
+// Update Category
 export async function updateCategory(
   id: string,
   updates: Partial<Omit<Category, "id" | "createdAt">>
-) {
+): Promise<Category> {
   const allowedFields = [
     "name",
     "slug",
@@ -71,56 +91,70 @@ export async function updateCategory(
     "isActive",
   ] as const;
 
-  const fields = allowedFields.filter(
+  const hasUpdates = allowedFields.some(
     (field) => updates[field] !== undefined
   );
 
-  if (fields.length === 0) {
+  if (!hasUpdates) {
     throw new Error("No valid fields provided");
   }
 
-  const expressionNames: Record<string, string> = {};
-  const expressionValues: Record<string, unknown> = {};
+  const rows = await sql`
+    UPDATE categories
+    SET
+      name = CASE
+        WHEN ${updates.name !== undefined}
+        THEN ${updates.name ?? null}
+        ELSE name
+      END,
 
-  const expressions = fields.map((field, index) => {
-    expressionNames[`#field${index}`] = field;
-    expressionValues[`:value${index}`] = updates[field];
+      slug = CASE
+        WHEN ${updates.slug !== undefined}
+        THEN ${updates.slug ?? null}
+        ELSE slug
+      END,
 
-    return `#field${index} = :value${index}`;
-  });
+      description = CASE
+        WHEN ${updates.description !== undefined}
+        THEN ${updates.description ?? null}
+        ELSE description
+      END,
 
-  expressionNames["#updatedAt"] = "updatedAt";
-  expressionValues[":updatedAt"] = new Date().toISOString();
+      image = CASE
+        WHEN ${updates.image !== undefined}
+        THEN ${updates.image ?? null}
+        ELSE image
+      END,
 
-  const result = await dynamoDB.send(
-    new UpdateCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: "CATEGORY",
-        SK: `CATEGORY#${id}`,
-      },
-      UpdateExpression: `SET ${expressions.join(", ")}, #updatedAt = :updatedAt`,
-      ExpressionAttributeNames: expressionNames,
-      ExpressionAttributeValues: expressionValues,
-      ConditionExpression: "attribute_exists(PK)",
-      ReturnValues: "ALL_NEW",
-    })
-  );
+      is_active = CASE
+        WHEN ${updates.isActive !== undefined}
+        THEN ${updates.isActive ?? null}
+        ELSE is_active
+      END,
 
-  return result.Attributes as CategoryRecord;
+      updated_at = NOW()
+    WHERE id = ${id}
+    RETURNING *
+  `;
+
+  if (rows.length === 0) {
+    throw new Error("Category not found.");
+  }
+
+  return mapCategory(rows[0] as CategoryRow);
 }
 
+// Delete Category
 export async function deleteCategory(id: string) {
-  await dynamoDB.send(
-    new DeleteCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: "CATEGORY",
-        SK: `CATEGORY#${id}`,
-      },
-      ConditionExpression: "attribute_exists(PK)",
-    })
-  );
+  const rows = await sql`
+    DELETE FROM categories
+    WHERE id = ${id}
+    RETURNING id
+  `;
 
-  return { id };
+  if (rows.length === 0) {
+    throw new Error("Category not found.");
+  }
+
+  return { id: rows[0].id as string };
 }

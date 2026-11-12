@@ -5,7 +5,11 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/options";
 import { getAllOrders } from "@/repositories/order.repository";
 
-export async function GET() {
+export async function GET(request: Request) {
+  // This request-specific read opts the GET handler out of prerendering.
+  // Keep it outside try/catch so Next.js can handle its prerender bailout.
+  void request.headers.get("cookie");
+
   try {
     const session = await getServerSession(authOptions);
 

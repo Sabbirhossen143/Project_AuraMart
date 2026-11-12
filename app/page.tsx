@@ -313,7 +313,7 @@ export default function Home() {
       return;
     }
 
-    // Logged-in user: refresh DynamoDB cart count
+    // Logged-in user: refresh cart count
     const cartResponse = await fetch("/api/cart", {
       cache: "no-store",
     });
@@ -333,7 +333,10 @@ export default function Home() {
 }
 
   async function handleAddToWishlist(productId: string) {
-  if (wishlistIds.includes(productId)) return;
+  if (wishlistIds.includes(productId)) {
+  toast.error("Product is already in your wishlist!");
+  return;
+}
 
   try {
     const response = await fetch("/api/wishlist", {
@@ -1077,7 +1080,7 @@ export default function Home() {
         ? "Already in wishlist"
         : "Add to wishlist"
     }
-    disabled={wishlistIds.includes(product.id)}
+    
     onClick={(event) => {
       event.stopPropagation();
       void handleAddToWishlist(product.id);

@@ -150,7 +150,7 @@ function ProductDetailsContent() {
       );
     }
 
-    // Logged-in user: cart saved in DynamoDB
+    // Logged-in user: cart saved in Neon PostgreSQL
     window.dispatchEvent(new Event("cart-updated"));
 
     toast.success("Product successfully added to your cart.");

@@ -66,9 +66,11 @@ export async function POST(request: NextRequest) {
     console.error("Registration error:", error);
 
     if (
-      error instanceof Error &&
-      error.name === "TransactionCanceledException"
-    ) {
+  typeof error === "object" &&
+  error !== null &&
+  "code" in error &&
+  error.code === "23505"
+) {
       return NextResponse.json(
         {
           success: false,

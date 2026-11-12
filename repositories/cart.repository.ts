@@ -1,43 +1,31 @@
 
-import {
-  QueryCommand,
-  UpdateCommand,
-  DeleteCommand,
-} from "@aws-sdk/lib-dynamodb";
-
-import { dynamoDB } from "@/lib/aws/dynamodb";
+import { sql } from "@/lib/db";
 import { getProductById } from "@/repositories/product.repository";
 import type {
   CartItem,
-  CartRecord,
   CartSummary,
 } from "@/types/cart";
-
-const TABLE_NAME = process.env.DYNAMODB_TABLE_NAME!;
 
 // Get User Cart
 export async function getCartItems(
   userId: string
 ): Promise<CartItem[]> {
-  const result = await dynamoDB.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      KeyConditionExpression:
-        "PK = :pk AND begins_with(SK, :sk)",
-      ExpressionAttributeValues: {
-        ":pk": `USER#${userId}`,
-        ":sk": "CART#",
-      },
-    })
-  );
+  const rows = await sql`
+    SELECT
+      product_id,
+      quantity,
+      added_at,
+      updated_at
+    FROM cart_items
+    WHERE user_id = ${userId}
+    ORDER BY added_at DESC
+  `;
 
-  return (result.Items || []).map((item) => ({
-    productId:
-      item.productId ||
-      item.SK.replace("CART#PRODUCT#", ""),
-    quantity: item.quantity,
-    addedAt: item.addedAt,
-    updatedAt: item.updatedAt,
+  return rows.map((row) => ({
+    productId: String(row.product_id),
+    quantity: Number(row.quantity),
+    addedAt: new Date(row.added_at as string).toISOString(),
+    updatedAt: new Date(row.updated_at as string).toISOString(),
   }));
 }
 
@@ -49,9 +37,7 @@ export async function getCartSummary(
 
   const items = await Promise.all(
     cartItems.map(async (cartItem) => {
-      const product = await getProductById(
-        cartItem.productId
-      );
+      const product = await getProductById(cartItem.productId);
 
       if (!product) {
         throw new Error(
@@ -59,19 +45,18 @@ export async function getCartSummary(
         );
       }
 
-      const subtotal =
-        product.price * cartItem.quantity;
+      const subtotal = product.price * cartItem.quantity;
 
       return {
         ...cartItem,
         product: {
-  id: product.id,
-  name: product.name,
-  description: product.description,
-  imageUrl: product.imageUrl,
-  price: product.price,
-  stock: product.stock,
-},
+          id: product.id,
+          name: product.name,
+          description: product.description,
+          imageUrl: product.imageUrl,
+          price: product.price,
+          stock: product.stock,
+        },
         subtotal,
       };
     })
@@ -100,62 +85,64 @@ export async function addToCart(
   productId: string,
   quantity: number
 ) {
-  // Check product existence
   const product = await getProductById(productId);
 
   if (!product) {
     throw new Error("Product not found.");
   }
 
-  // Check product stock
   if (product.stock <= 0) {
     throw new Error("Product is out of stock.");
   }
 
-  if (quantity > product.stock) {
-    throw new Error("Requested quantity exceeds available stock.");
+  if (quantity < 1) {
+    throw new Error("Quantity must be at least 1.");
   }
 
-  const now = new Date().toISOString();
+  if (quantity > product.stock) {
+    throw new Error(
+      "Requested quantity exceeds available stock."
+    );
+  }
 
-  const result = await dynamoDB.send(
-    new UpdateCommand({
-      TableName: TABLE_NAME,
+  const rows = await sql`
+    INSERT INTO cart_items (
+      user_id,
+      product_id,
+      quantity,
+      added_at,
+      updated_at
+    )
+    VALUES (
+      ${userId},
+      ${productId},
+      ${quantity},
+      NOW(),
+      NOW()
+    )
+    ON CONFLICT (user_id, product_id)
+    DO UPDATE SET
+      quantity = cart_items.quantity + EXCLUDED.quantity,
+      updated_at = NOW()
+    WHERE cart_items.quantity + EXCLUDED.quantity <= ${product.stock}
+    RETURNING *
+  `;
 
-      Key: {
-        PK: `USER#${userId}`,
-        SK: `CART#PRODUCT#${productId}`,
-      },
+  if (!rows.length) {
+    throw new Error(
+      "Requested quantity exceeds available stock."
+    );
+  }
 
-      UpdateExpression: `
-  SET
-    productId = :productId,
-    quantity = if_not_exists(quantity, :zero) + :quantity,
-    addedAt = if_not_exists(addedAt, :now),
-    updatedAt = :now,
-    entityType = :entityType
-`,
-      ConditionExpression:
-        "attribute_not_exists(quantity) OR quantity <= :maxExisting",
-
-      ExpressionAttributeValues: {
-  ":productId": productId,
-  ":zero": 0,
-  ":quantity": quantity,
-  ":maxExisting": product.stock - quantity,
-  ":now": now,
-  ":entityType": "CART",
-},
-
-      ReturnValues: "ALL_NEW",
-    })
-  );
-
-  return result.Attributes as CartRecord;
+  return {
+    productId: String(rows[0].product_id),
+    quantity: Number(rows[0].quantity),
+    addedAt: new Date(rows[0].added_at as string).toISOString(),
+    updatedAt: new Date(rows[0].updated_at as string).toISOString(),
+  };
 }
 
-
- // UPDATE CART ITEM QUANTITY
+// Update Cart Item Quantity
 export async function updateCartQuantity(
   userId: string,
   productId: string,
@@ -167,48 +154,53 @@ export async function updateCartQuantity(
     throw new Error("Product not found.");
   }
 
-  if (quantity > product.stock) {
-    throw new Error("Requested quantity exceeds available stock.");
+  if (quantity < 1) {
+    throw new Error("Quantity must be at least 1.");
   }
 
-  const now = new Date().toISOString();
+  if (quantity > product.stock) {
+    throw new Error(
+      "Requested quantity exceeds available stock."
+    );
+  }
 
-  const result = await dynamoDB.send(
-    new UpdateCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `USER#${userId}`,
-        SK: `CART#PRODUCT#${productId}`,
-      },
-      UpdateExpression: "SET quantity = :quantity, updatedAt = :now",
-      ConditionExpression: "attribute_exists(PK) AND attribute_exists(SK)",
-      ExpressionAttributeValues: {
-        ":quantity": quantity,
-        ":now": now,
-      },
-      ReturnValues: "ALL_NEW",
-    })
-  );
+  const rows = await sql`
+    UPDATE cart_items
+    SET
+      quantity = ${quantity},
+      updated_at = NOW()
+    WHERE user_id = ${userId}
+      AND product_id = ${productId}
+    RETURNING *
+  `;
 
-  return result.Attributes as CartRecord;
+  if (!rows.length) {
+    throw new Error("Cart item not found.");
+  }
+
+  return {
+    productId: String(rows[0].product_id),
+    quantity: Number(rows[0].quantity),
+    addedAt: new Date(rows[0].added_at as string).toISOString(),
+    updatedAt: new Date(rows[0].updated_at as string).toISOString(),
+  };
 }
 
-// REMOVE ITEM FROM CART
+// Remove Item From Cart
 export async function removeFromCart(
   userId: string,
   productId: string
 ) {
-  await dynamoDB.send(
-    new DeleteCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `USER#${userId}`,
-        SK: `CART#PRODUCT#${productId}`,
-      },
-      ConditionExpression: "attribute_exists(PK) AND attribute_exists(SK)",
-    })
-  );
+  const rows = await sql`
+    DELETE FROM cart_items
+    WHERE user_id = ${userId}
+      AND product_id = ${productId}
+    RETURNING product_id
+  `;
 
-  return { productId };
+  if (!rows.length) {
+    throw new Error("Cart item not found.");
+  }
+
+  return { productId: String(rows[0].product_id) };
 }
-

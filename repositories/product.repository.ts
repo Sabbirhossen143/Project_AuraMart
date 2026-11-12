@@ -1,17 +1,50 @@
 
-import {
-  GetCommand,
-  PutCommand,
-  UpdateCommand,
-  DeleteCommand,
-  QueryCommand,
-} from "@aws-sdk/lib-dynamodb";
-
-import { dynamoDB } from "@/lib/aws/dynamodb";
-import type { Product, ProductRecord } from "@/types/product";
+import { sql } from "@/lib/db";
+import type { Product } from "@/types/product";
 import { getCategoryById } from "@/repositories/category.repository";
 
-const TABLE_NAME = process.env.DYNAMODB_TABLE_NAME!;
+// ============================================
+// Database Row Type
+// ============================================
+
+interface ProductRow {
+  id: string;
+  name: string;
+  description: string;
+  image_url: string | null;
+  price: string | number;
+  discount_percent: string | number | null;
+  stock: number;
+  category_id: string;
+  created_at: Date | string;
+  updated_at: Date | string;
+}
+
+// ============================================
+// Helper: Map Database Row
+// ============================================
+
+function mapProduct(row: ProductRow): Product {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    imageUrl: row.image_url ?? undefined,
+    price: Number(row.price),
+    discountPercent:
+      row.discount_percent === null
+        ? undefined
+        : Number(row.discount_percent),
+    stock: Number(row.stock),
+    categoryId: row.category_id,
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString(),
+  };
+}
+
+// ============================================
+// Validate Category
+// ============================================
 
 async function validateCategory(categoryId: string) {
   const category = await getCategoryById(categoryId);
@@ -27,200 +60,219 @@ async function validateCategory(categoryId: string) {
   return category;
 }
 
+// ============================================
 // Create Product
-export async function createProduct(product: Product) {
+// ============================================
+
+export async function createProduct(
+  product: Product
+): Promise<Product> {
   await validateCategory(product.categoryId);
 
-  const item: ProductRecord = {
-    PK: `PRODUCT#${product.id}`,
-    SK: "METADATA",
-    entityType: "PRODUCT",
+  const result = await sql`
+    INSERT INTO products (
+      id,
+      name,
+      description,
+      image_url,
+      price,
+      discount_percent,
+      stock,
+      category_id,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      ${product.id},
+      ${product.name},
+      ${product.description},
+      ${product.imageUrl ?? null},
+      ${product.price},
+      ${product.discountPercent ?? null},
+      ${product.stock},
+      ${product.categoryId},
+      ${product.createdAt},
+      ${product.updatedAt}
+    )
+    RETURNING *
+  `;
 
-    GSI1PK: "PRODUCT",
-    GSI1SK: `CREATED#${product.createdAt}#${product.id}`,
-
-    GSI2PK: `CATEGORY#${product.categoryId}`,
-    GSI2SK: `CREATED#${product.createdAt}#${product.id}`,
-
-    ...product,
-  };
-
-  await dynamoDB.send(
-    new PutCommand({
-      TableName: TABLE_NAME,
-      Item: item,
-      ConditionExpression:
-        "attribute_not_exists(PK) AND attribute_not_exists(SK)",
-    })
-  );
-
-  return item;
+  return mapProduct(result[0] as ProductRow);
 }
 
+// ============================================
 // Get Product By ID
-export async function getProductById(id: string) {
-  const result = await dynamoDB.send(
-    new GetCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `PRODUCT#${id}`,
-        SK: "METADATA",
-      },
-    })
-  );
+// ============================================
 
-  return (result.Item as ProductRecord | undefined) ?? null;
+export async function getProductById(
+  id: string
+): Promise<Product | null> {
+  const result = await sql`
+    SELECT *
+    FROM products
+    WHERE id = ${id}
+    LIMIT 1
+  `;
+
+  if (result.length === 0) {
+    return null;
+  }
+
+  return mapProduct(result[0] as ProductRow);
 }
 
+// ============================================
 // Get All Products
-export async function getAllProducts(limit = 20) {
-  const result = await dynamoDB.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      IndexName: "GSI1",
-      KeyConditionExpression: "GSI1PK = :pk",
-      ExpressionAttributeValues: {
-        ":pk": "PRODUCT",
-      },
-      Limit: limit,
-      ScanIndexForward: false,
-    })
-  );
+// ============================================
 
-  return (result.Items as ProductRecord[] | undefined) ?? [];
+export async function getAllProducts(
+  limit = 20
+): Promise<Product[]> {
+  const result = await sql`
+    SELECT *
+    FROM products
+    ORDER BY created_at DESC
+    LIMIT ${limit}
+  `;
+
+  return result.map((row) =>
+    mapProduct(row as ProductRow)
+  );
 }
 
+// ============================================
 // Get Products By Category
+// ============================================
+
 export async function getProductsByCategory(
   categoryId: string,
   limit = 20
-) {
-  const result = await dynamoDB.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      IndexName: "GSI2",
-      KeyConditionExpression: "GSI2PK = :pk",
-      ExpressionAttributeValues: {
-        ":pk": `CATEGORY#${categoryId}`,
-      },
-      Limit: limit,
-      ScanIndexForward: false,
-    })
-  );
+): Promise<Product[]> {
+  const result = await sql`
+    SELECT *
+    FROM products
+    WHERE category_id = ${categoryId}
+    ORDER BY created_at DESC
+    LIMIT ${limit}
+  `;
 
-  return (result.Items as ProductRecord[] | undefined) ?? [];
+  return result.map((row) =>
+    mapProduct(row as ProductRow)
+  );
 }
 
+// ============================================
 // Update Product
+// ============================================
+
 export async function updateProduct(
   id: string,
   updates: Partial<
-  Pick<
-    Product,
-    "name" | "description" | "imageUrl" | "price" | "stock" | "categoryId" | "discountPercent"
+    Pick<
+      Product,
+      | "name"
+      | "description"
+      | "imageUrl"
+      | "price"
+      | "stock"
+      | "categoryId"
+      | "discountPercent"
+    >
   >
->
-) {
+): Promise<Product> {
   const allowedFields = [
-  "name",
-  "description",
-  "imageUrl",
-  "price",
-  "discountPercent",
-  "stock",
-  "categoryId",
-] as const;
+    "name",
+    "description",
+    "imageUrl",
+    "price",
+    "discountPercent",
+    "stock",
+    "categoryId",
+  ] as const;
 
   const updateEntries = Object.entries(updates).filter(
     ([key, value]) =>
-      allowedFields.includes(key as (typeof allowedFields)[number]) &&
-      value !== undefined
+      allowedFields.includes(
+        key as (typeof allowedFields)[number]
+      ) && value !== undefined
   );
 
   if (updateEntries.length === 0) {
     throw new Error("No valid fields provided for update.");
   }
 
-  const expressionNames: Record<string, string> = {};
-  const expressionValues: Record<string, unknown> = {};
-  const updateExpressions: string[] = [];
-
-  updateEntries.forEach(([key, value], index) => {
-    const nameKey = `#field${index}`;
-    const valueKey = `:value${index}`;
-
-    expressionNames[nameKey] = key;
-    expressionValues[valueKey] = value;
-
-    updateExpressions.push(`${nameKey} = ${valueKey}`);
-  });
-
-  expressionNames["#updatedAt"] = "updatedAt";
-  expressionValues[":updatedAt"] = new Date().toISOString();
-
-  updateExpressions.push("#updatedAt = :updatedAt");
-
-  // Update category index keys if category changes
+  // Validate category if it changes
   const categoryUpdate = updateEntries.find(
     ([key]) => key === "categoryId"
   );
 
   if (categoryUpdate) {
-    const categoryId = String(categoryUpdate[1]);
+    await validateCategory(String(categoryUpdate[1]));
+  }
 
-    await validateCategory(categoryId);
+  const columnMap: Record<string, string> = {
+    name: "name",
+    description: "description",
+    imageUrl: "image_url",
+    price: "price",
+    discountPercent: "discount_percent",
+    stock: "stock",
+    categoryId: "category_id",
+  };
 
-    expressionNames["#gsi2pk"] = "GSI2PK";
-    expressionNames["#gsi2sk"] = "GSI2SK";
+  const setClauses: string[] = [];
+  const values: unknown[] = [];
 
-    expressionValues[":gsi2pk"] = `CATEGORY#${categoryId}`;
+  for (const [key, value] of updateEntries) {
+    const column = columnMap[key];
 
-    // Preserve creation-time ordering
-    const existing = await getProductById(id);
+    values.push(value === "" && key === "imageUrl" ? null : value);
 
-    if (!existing) {
-      throw new Error("Product not found.");
-    }
-
-    expressionValues[":gsi2sk"] =
-      `CREATED#${existing.createdAt}#${id}`;
-
-    updateExpressions.push(
-      "#gsi2pk = :gsi2pk",
-      "#gsi2sk = :gsi2sk"
+    setClauses.push(
+      `${column} = $${values.length}`
     );
   }
 
-  const result = await dynamoDB.send(
-    new UpdateCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `PRODUCT#${id}`,
-        SK: "METADATA",
-      },
-      UpdateExpression: `SET ${updateExpressions.join(", ")}`,
-      ExpressionAttributeNames: expressionNames,
-      ExpressionAttributeValues: expressionValues,
-      ConditionExpression: "attribute_exists(PK)",
-      ReturnValues: "ALL_NEW",
-    })
+  values.push(new Date().toISOString());
+  setClauses.push(`updated_at = $${values.length}`);
+
+  values.push(id);
+
+  const query = `
+    UPDATE products
+    SET ${setClauses.join(", ")}
+    WHERE id = $${values.length}
+    RETURNING *
+  `;
+
+  const result = await sql.query(
+    query,
+    values
   );
 
-  return result.Attributes as ProductRecord;
+  if (result.length === 0) {
+    throw new Error("Product not found.");
+  }
+
+  return mapProduct(result[0] as ProductRow);
 }
 
+// ============================================
 // Delete Product
-export async function deleteProduct(id: string) {
-  await dynamoDB.send(
-    new DeleteCommand({
-      TableName: TABLE_NAME,
-      Key: {
-        PK: `PRODUCT#${id}`,
-        SK: "METADATA",
-      },
-      ConditionExpression: "attribute_exists(PK)",
-    })
-  );
+// ============================================
 
-  return { id };
+export async function deleteProduct(
+  id: string
+): Promise<{ id: string }> {
+  const result = await sql`
+    DELETE FROM products
+    WHERE id = ${id}
+    RETURNING id
+  `;
+
+  if (result.length === 0) {
+    throw new Error("Product not found.");
+  }
+
+  return { id: result[0].id as string };
 }
