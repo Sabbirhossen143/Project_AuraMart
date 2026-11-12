@@ -56,6 +56,10 @@ export default function AccountDashboard() {
     totalOrders: 0,
     wishlistItems: 0,
   });
+  const [adminStats, setAdminStats] = useState({
+    totalOrders: 0,
+    totalUsers: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [adminProducts, setAdminProducts] = useState<AdminProduct[]>([]);
@@ -164,8 +168,41 @@ export default function AccountDashboard() {
 
       setStats({ totalOrders, wishlistItems });
 
-      // Load products for ADMIN dashboard independently from profile loading.
+      // ADMIN-only totals: all orders and all registered users.
       if (user.role === "ADMIN") {
+        const [ordersResult, usersResult] = await Promise.allSettled([
+          fetch("/api/admin/orders", { cache: "no-store" }),
+          fetch("/api/admin/users", { cache: "no-store" }),
+        ]);
+
+        let allOrdersCount = 0;
+        let allUsersCount = 0;
+
+        if (ordersResult.status === "fulfilled" && ordersResult.value.ok) {
+          try {
+            const result = await ordersResult.value.json();
+            const data = result.data ?? result;
+            const rows = Array.isArray(data) ? data : Array.isArray(data.orders) ? data.orders : [];
+            allOrdersCount = Number(result.totalOrders ?? result.total ?? result.count ?? rows.length);
+          } catch {
+            allOrdersCount = 0;
+          }
+        }
+
+        if (usersResult.status === "fulfilled" && usersResult.value.ok) {
+          try {
+            const result = await usersResult.value.json();
+            const data = result.data ?? result;
+            const rows = Array.isArray(data) ? data : Array.isArray(data.users) ? data.users : [];
+            allUsersCount = Number(result.totalUsers ?? result.total ?? result.count ?? rows.length);
+          } catch {
+            allUsersCount = 0;
+          }
+        }
+
+        setAdminStats({ totalOrders: allOrdersCount, totalUsers: allUsersCount });
+
+        // Load products for ADMIN dashboard independently from profile loading.
         try {
           const productsResponse = await fetch("/api/products", {
             cache: "no-store",
@@ -189,6 +226,7 @@ export default function AccountDashboard() {
         }
       } else {
         setAdminProducts([]);
+        setAdminStats({ totalOrders: 0, totalUsers: 0 });
       }
     } catch (err) {
       const message =
@@ -349,8 +387,8 @@ export default function AccountDashboard() {
             <span>My Account</span>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-6">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-nowrap items-center justify-between gap-2 sm:gap-6">
+            <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
               <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/30 bg-white text-2xl font-bold text-indigo-700 shadow-lg">
                 {profile.profileImage ? (
                   <img
@@ -363,14 +401,14 @@ export default function AccountDashboard() {
                 )}
               </div>
 
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm text-indigo-100">
                   Welcome back,
                 </p>
-                <h1 className="mt-1 text-2xl font-bold sm:text-3xl">
+                <h1 className="mt-1 truncate text-lg font-bold sm:text-3xl">
                   {profile.name}
                 </h1>
-                <p className="mt-1 text-sm text-indigo-100">
+                <p className="mt-1 truncate text-xs text-indigo-100 sm:text-sm">
                   {profile.email}
                 </p>
               </div>
@@ -382,7 +420,7 @@ export default function AccountDashboard() {
                   callbackUrl: "/login",
                 })
               }
-              className="inline-flex items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-white/30 bg-white/10 px-2.5 py-2 text-xs font-semibold text-white transition hover:bg-white/20 sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm"
             >
               <LogOut size={17} />
               Sign Out
@@ -393,70 +431,112 @@ export default function AccountDashboard() {
 
       <main className="mx-auto max-w-6xl space-y-8 px-4 py-10 sm:py-12">
         {/* Account Statistics */}
-        <section className="grid gap-5 sm:grid-cols-3">
-          <div className="premium-card rounded-3xl border border-white/80 bg-white p-6 shadow-[0_16px_45px_-30px_rgba(15,23,42,0.28)] ring-1 ring-slate-200/70">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-500">
-                  Total Orders
-                </p>
-                <h2 className="mt-2 text-3xl font-bold text-slate-900">
-                  {stats.totalOrders}
-                </h2>
+        {profile.role === "ADMIN" ? (
+          <section className="grid grid-cols-2 gap-3 sm:gap-5">
+            <div className="premium-card rounded-2xl border border-white/80 bg-white p-4 shadow-[0_16px_45px_-30px_rgba(15,23,42,0.28)] ring-1 ring-slate-200/70 sm:rounded-3xl sm:p-6">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-slate-500 sm:text-sm">Total Orders</p>
+                  <h2 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">{adminStats.totalOrders}</h2>
+                </div>
+                <div className="shrink-0 rounded-xl bg-indigo-50 p-2 text-indigo-600 sm:p-3">
+                  <Package size={21} className="sm:h-[25px] sm:w-[25px]" />
+                </div>
               </div>
-              <div className="rounded-xl bg-indigo-50 p-3 text-indigo-600">
-                <Package size={25} />
-              </div>
+              <Link href="/admin/orders" className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700 sm:mt-5 sm:gap-2 sm:text-sm">
+                Manage Orders <ArrowRight size={14} />
+              </Link>
             </div>
-            <Link
-              href="/account/orders"
-              className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-indigo-600 hover:text-indigo-700"
-            >
-              View Orders <ArrowRight size={16} />
-            </Link>
-          </div>
 
-          <div className="premium-card rounded-3xl border border-white/80 bg-white p-6 shadow-[0_16px_45px_-30px_rgba(15,23,42,0.28)] ring-1 ring-slate-200/70">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-500">
-                  Wishlist Items
-                </p>
-                <h2 className="mt-2 text-3xl font-bold text-slate-900">
-                  {stats.wishlistItems}
-                </h2>
+            <div className="premium-card rounded-2xl border border-white/80 bg-white p-4 shadow-[0_16px_45px_-30px_rgba(15,23,42,0.28)] ring-1 ring-slate-200/70 sm:rounded-3xl sm:p-6">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-slate-500 sm:text-sm">Total Users</p>
+                  <h2 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">{adminStats.totalUsers}</h2>
+                </div>
+                <div className="shrink-0 rounded-xl bg-violet-50 p-2 text-violet-600 sm:p-3">
+                  <UserRound size={21} className="sm:h-[25px] sm:w-[25px]" />
+                </div>
               </div>
-              <div className="rounded-xl bg-pink-50 p-3 text-pink-600">
-                <Heart size={25} />
-              </div>
+              <Link href="/admin/users" className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-700 sm:mt-5 sm:gap-2 sm:text-sm">
+                Manage Users <ArrowRight size={14} />
+              </Link>
             </div>
-            <Link
-              href="/wishlist"
-              className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-pink-600 hover:text-pink-700"
-            >
-              View Wishlist <ArrowRight size={16} />
-            </Link>
-          </div>
 
-          <div className="premium-card rounded-3xl border border-white/80 bg-white p-6 shadow-[0_16px_45px_-30px_rgba(15,23,42,0.28)] ring-1 ring-slate-200/70">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-500">
-                  Account Status
-                </p>
-                <h2 className="mt-2 text-2xl font-bold text-slate-900">
-                  {profile.isActive ? "Active" : "Inactive"}
-                </h2>
+            <div className="premium-card rounded-2xl border border-white/80 bg-white p-4 shadow-[0_16px_45px_-30px_rgba(15,23,42,0.28)] ring-1 ring-slate-200/70 sm:rounded-3xl sm:p-6">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-slate-500 sm:text-sm">My Orders</p>
+                  <h2 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">{stats.totalOrders}</h2>
+                </div>
+                <div className="shrink-0 rounded-xl bg-blue-50 p-2 text-blue-600 sm:p-3">
+                  <ShoppingBag size={21} className="sm:h-[25px] sm:w-[25px]" />
+                </div>
               </div>
-              <div className="rounded-xl bg-emerald-50 p-3 text-emerald-600">
-                <ShieldCheck size={25} />
-              </div>
+              <Link href="/account/orders" className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700 sm:mt-5 sm:gap-2 sm:text-sm">
+                View My Orders <ArrowRight size={14} />
+              </Link>
             </div>
-            <p className="mt-5 text-sm font-medium text-slate-500">
-              Role: {profile.role}
-            </p>
-          </div>
-        </section>
+
+            <div className="premium-card rounded-2xl border border-white/80 bg-white p-4 shadow-[0_16px_45px_-30px_rgba(15,23,42,0.28)] ring-1 ring-slate-200/70 sm:rounded-3xl sm:p-6">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-slate-500 sm:text-sm">Account Status</p>
+                  <h2 className="mt-2 text-xl font-bold text-slate-900 sm:text-2xl">{profile.isActive ? "Active" : "Inactive"}</h2>
+                </div>
+                <div className="shrink-0 rounded-xl bg-emerald-50 p-2 text-emerald-600 sm:p-3">
+                  <ShieldCheck size={21} className="sm:h-[25px] sm:w-[25px]" />
+                </div>
+              </div>
+              <p className="mt-4 text-xs font-medium text-slate-500 sm:mt-5 sm:text-sm">Role: {profile.role}</p>
+            </div>
+          </section>
+        ) : (
+          <section className="grid grid-cols-2 gap-3 sm:gap-5">
+            <div className="premium-card rounded-2xl border border-white/80 bg-white p-4 shadow-[0_16px_45px_-30px_rgba(15,23,42,0.28)] ring-1 ring-slate-200/70 sm:rounded-3xl sm:p-6">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-slate-500 sm:text-sm">Total Orders</p>
+                  <h2 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">{stats.totalOrders}</h2>
+                </div>
+                <div className="shrink-0 rounded-xl bg-indigo-50 p-2 text-indigo-600 sm:p-3">
+                  <Package size={21} className="sm:h-[25px] sm:w-[25px]" />
+                </div>
+              </div>
+              <Link href="/account/orders" className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700 sm:mt-5 sm:gap-2 sm:text-sm">
+                View Orders <ArrowRight size={14} />
+              </Link>
+            </div>
+
+            <div className="premium-card rounded-2xl border border-white/80 bg-white p-4 shadow-[0_16px_45px_-30px_rgba(15,23,42,0.28)] ring-1 ring-slate-200/70 sm:rounded-3xl sm:p-6">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-slate-500 sm:text-sm">Wishlist Items</p>
+                  <h2 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">{stats.wishlistItems}</h2>
+                </div>
+                <div className="shrink-0 rounded-xl bg-pink-50 p-2 text-pink-600 sm:p-3">
+                  <Heart size={21} className="sm:h-[25px] sm:w-[25px]" />
+                </div>
+              </div>
+              <Link href="/wishlist" className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-pink-600 hover:text-pink-700 sm:mt-5 sm:gap-2 sm:text-sm">
+                View Wishlist <ArrowRight size={14} />
+              </Link>
+            </div>
+
+            <div className="premium-card rounded-2xl border border-white/80 bg-white p-4 shadow-[0_16px_45px_-30px_rgba(15,23,42,0.28)] ring-1 ring-slate-200/70 sm:rounded-3xl sm:p-6">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-slate-500 sm:text-sm">Account Status</p>
+                  <h2 className="mt-2 text-xl font-bold text-slate-900 sm:text-2xl">{profile.isActive ? "Active" : "Inactive"}</h2>
+                </div>
+                <div className="shrink-0 rounded-xl bg-emerald-50 p-2 text-emerald-600 sm:p-3">
+                  <ShieldCheck size={21} className="sm:h-[25px] sm:w-[25px]" />
+                </div>
+              </div>
+              <p className="mt-4 text-xs font-medium text-slate-500 sm:mt-5 sm:text-sm">Role: {profile.role}</p>
+            </div>
+          </section>
+        )}
 
         {/* Profile Information */}
         <section className="overflow-hidden rounded-3xl border border-white/80 bg-white shadow-[0_18px_55px_-32px_rgba(15,23,42,0.30)] ring-1 ring-slate-200/70">
@@ -637,7 +717,7 @@ export default function AccountDashboard() {
       </p>
     </div>
 
-    <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-7">
+    <div className="grid grid-cols-2 gap-3 p-3 sm:gap-4 sm:p-7">
       <Link
         href="/admin/orders"
         className="premium-card group flex items-center gap-4 rounded-xl border border-slate-200 p-5 transition hover:border-indigo-300 hover:bg-indigo-50/50"
@@ -738,7 +818,7 @@ export default function AccountDashboard() {
             </p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
             {menuItems.map((item) => {
               const Icon = item.icon;
 
