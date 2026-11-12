@@ -157,7 +157,7 @@ export default function OrdersPage() {
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-indigo-50/40">
       <section className="bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700 px-4 py-12 text-white sm:py-16">
         <div className="mx-auto max-w-6xl">
-          <div className="mb-3 flex items-center gap-2 text-sm text-indigo-100">
+          <div className="mb-2 flex items-center gap-1.5 text-xs text-indigo-100 sm:mb-3 sm:gap-2 sm:text-sm">
             <Link href="/" className="hover:text-white">
               Home
             </Link>
@@ -165,15 +165,16 @@ export default function OrdersPage() {
             <span>My Orders</span>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15">
-              <Package size={30} />
+          <div className="flex items-center gap-2.5 sm:gap-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 sm:h-14 sm:w-14 sm:rounded-2xl">
+              <Package size={22} className="sm:hidden" />
+              <Package size={30} className="hidden sm:block" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold sm:text-4xl">
+              <h1 className="text-xl font-bold sm:text-4xl">
                 My Orders
               </h1>
-              <p className="mt-1 text-sm text-indigo-100 sm:text-base">
+              <p className="mt-0.5 text-xs text-indigo-100 sm:mt-1 sm:text-base">
                 Track and manage all your purchases.
               </p>
             </div>
@@ -182,18 +183,17 @@ export default function OrdersPage() {
       </section>
 
       <section className="mx-auto max-w-6xl px-4 py-10 sm:py-14">
-        <div className="mb-7 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900">
-              Order History
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Showing {filteredOrders.length} of {orders.length} {orders.length === 1 ? "order" : "orders"}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative" ref={filterRef}>
+        <div className="mb-5 flex flex-col gap-3 sm:mb-7 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <h2 className="text-base font-bold text-slate-900 sm:text-xl">
+                Order History
+              </h2>
+              <p className="mt-0.5 text-[11px] text-slate-500 sm:mt-1 sm:text-sm">
+                Showing {filteredOrders.length} of {orders.length} {orders.length === 1 ? "order" : "orders"}
+              </p>
+            </div>
+            <div className="relative shrink-0" ref={filterRef}>
               <span className="sr-only" id="order-status-filter-label">
                 Filter orders by status
               </span>
@@ -204,21 +204,22 @@ export default function OrdersPage() {
                 aria-expanded={filterOpen}
                 aria-labelledby="order-status-filter-label"
                 onClick={() => setFilterOpen((open) => !open)}
-                className={`group inline-flex h-12 min-w-[190px] items-center justify-between gap-4 rounded-2xl border bg-white px-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-lg hover:shadow-indigo-100/70 focus:outline-none focus:ring-4 focus:ring-indigo-100 ${
+                className={`group inline-flex h-10 min-w-[132px] items-center justify-between gap-2 rounded-xl border bg-white px-2.5 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-lg hover:shadow-indigo-100/70 focus:outline-none focus:ring-4 focus:ring-indigo-100 sm:h-12 sm:min-w-[190px] sm:gap-4 sm:rounded-2xl sm:px-4 ${
                   filterOpen
                     ? "border-indigo-400 ring-4 ring-indigo-100"
                     : "border-slate-200"
                 }`}
               >
                 <span className="flex min-w-0 items-center gap-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-200">
-                    <SlidersHorizontal size={15} />
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-200 sm:h-8 sm:w-8 sm:rounded-xl">
+                    <SlidersHorizontal size={12} className="sm:hidden" />
+                    <SlidersHorizontal size={15} className="hidden sm:block" />
                   </span>
                   <span className="min-w-0">
-                    <span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                    <span className="block text-[8px] font-bold uppercase tracking-[0.08em] text-slate-400 sm:text-[10px] sm:tracking-[0.12em]">
                       Filter by
                     </span>
-                    <span className="mt-0.5 block truncate text-sm font-extrabold text-slate-800">
+                    <span className="mt-0.5 block truncate text-[11px] font-extrabold text-slate-800 sm:text-sm">
                       {selectedStatusLabel}
                     </span>
                   </span>
@@ -310,14 +311,15 @@ export default function OrdersPage() {
                 </div>
               )}
             </div>
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600"
-            >
-            <ShoppingBag size={17} />
-              Continue Shopping
-            </Link>
           </div>
+          <Link
+            href="/"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 sm:w-auto sm:self-end sm:text-sm"
+          >
+            <ShoppingBag size={15} className="sm:hidden" />
+            <ShoppingBag size={17} className="hidden sm:block" />
+            Continue Shopping
+          </Link>
         </div>
 
         {loading ? (
@@ -388,18 +390,28 @@ export default function OrdersPage() {
                 key={order.id}
                 className="premium-card overflow-hidden rounded-3xl border border-white bg-white shadow-lg shadow-slate-200/40 ring-1 ring-slate-100 transition duration-300 hover:-translate-y-0.5 hover:shadow-xl"
               >
-                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 px-5 py-4 sm:px-6">
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
-                      Order ID
-                    </p>
-                    <p className="mt-1 break-all font-semibold text-slate-900">
+                <div className="flex items-start justify-between gap-2 border-b border-slate-100 px-3 py-3 sm:px-6 sm:py-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400 sm:text-xs">
+                        Order ID
+                      </p>
+                      <span
+                        className={`inline-flex rounded-full border px-2 py-0.5 text-[9px] font-bold sm:hidden ${
+                          statusStyles[order.orderStatus] ||
+                          "border-slate-200 bg-slate-50 text-slate-600"
+                        }`}
+                      >
+                        {order.orderStatus}
+                      </span>
+                    </div>
+                    <p className="mt-1 break-all text-xs font-semibold leading-5 text-slate-900 sm:text-base">
                       #{order.id}
                     </p>
                   </div>
 
                   <span
-                    className={`rounded-full border px-3 py-1.5 text-xs font-bold ${
+                    className={`hidden shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold sm:inline-flex ${
                       statusStyles[order.orderStatus] ||
                       "border-slate-200 bg-slate-50 text-slate-600"
                     }`}
@@ -408,56 +420,59 @@ export default function OrdersPage() {
                   </span>
                 </div>
 
-                <div className="grid gap-5 px-5 py-5 sm:grid-cols-3 sm:px-6">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-3 px-3 py-3 sm:grid-cols-3 sm:gap-5 sm:px-6 sm:py-5">
                   <div>
                     <div className="flex items-center gap-2 text-slate-400">
-                      <CalendarDays size={16} />
-                      <span className="text-xs font-medium uppercase tracking-wide">
+                      <CalendarDays size={13} className="sm:hidden" />
+                      <CalendarDays size={16} className="hidden sm:block" />
+                      <span className="text-[10px] font-medium uppercase tracking-wide sm:text-xs">
                         Order Date
                       </span>
                     </div>
-                    <p className="mt-2 font-semibold text-slate-800">
+                    <p className="mt-1 text-xs font-semibold text-slate-800 sm:mt-2 sm:text-base">
                       {formatDate(order.createdAt)}
                     </p>
                   </div>
 
                   <div>
                     <div className="flex items-center gap-2 text-slate-400">
-                      <Box size={16} />
-                      <span className="text-xs font-medium uppercase tracking-wide">
+                      <Box size={13} className="sm:hidden" />
+                      <Box size={16} className="hidden sm:block" />
+                      <span className="text-[10px] font-medium uppercase tracking-wide sm:text-xs">
                         Items
                       </span>
                     </div>
-                    <p className="mt-2 font-semibold text-slate-800">
+                    <p className="mt-1 text-xs font-semibold text-slate-800 sm:mt-2 sm:text-base">
                       {order.totalItems}{" "}
                       {order.totalItems === 1 ? "item" : "items"}
                     </p>
                   </div>
 
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                  <div className="col-span-2 border-t border-slate-100 pt-2 sm:col-span-1 sm:border-0 sm:pt-0">
+                    <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:text-xs">
                       Total Amount
                     </p>
-                    <p className="mt-2 text-lg font-bold text-indigo-600">
+                    <p className="mt-1 text-base font-bold text-indigo-600 sm:mt-2 sm:text-lg">
                       {formatPrice(order.totalAmount)}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/70 px-5 py-4 sm:px-6">
+                <div className="flex items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/70 px-3 py-3 sm:gap-3 sm:px-6 sm:py-4">
                   <div>
-                    <p className="text-xs text-slate-400">Payment</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-700">
+                    <p className="text-[10px] text-slate-400 sm:text-xs">Payment</p>
+                    <p className="mt-0.5 text-xs font-semibold text-slate-700 sm:mt-1 sm:text-sm">
                       {order.paymentMethod} · {order.paymentStatus}
                     </p>
                   </div>
 
                   <Link
                     href={`/account/orders/${order.id}`}
-                    className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                    className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-2 text-[11px] font-semibold !text-white transition hover:bg-indigo-700 sm:gap-2 sm:rounded-xl sm:px-4 sm:py-2.5 sm:text-sm"
                   >
                     View Details
-                    <ArrowRight size={16} />
+                    <ArrowRight size={13} className="sm:hidden" />
+                    <ArrowRight size={16} className="hidden sm:block" />
                   </Link>
                 </div>
               </article>
